@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(findstr:*)",
+      "Bash(dir /B \"C:\\Users\\ardil\\Unity Projects\\tank-multiplayer\\Assets\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
