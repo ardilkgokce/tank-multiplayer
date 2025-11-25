@@ -26,9 +26,6 @@ public class TeamManager : MonoBehaviour
     {
         // Layer ID'lerini cache'le
         CacheLayers();
-
-        // Collision matrix'i yapılandır
-        ConfigureCollisionMatrix();
     }
 
     /// <summary>
@@ -52,27 +49,6 @@ public class TeamManager : MonoBehaviour
         {
             Debug.LogError($"Layer '{LAYER_SPECTATOR}' bulunamadı! Unity Editor'de bu layer'ı oluşturun.");
         }
-    }
-
-    /// <summary>
-    /// Physics2D collision matrix'ini yapılandırır.
-    /// Farklı takımlar birbirine çarpmaz.
-    /// </summary>
-    private void ConfigureCollisionMatrix()
-    {
-        if (layerTeamA == -1 || layerTeamB == -1) return;
-
-        // TeamA ve TeamB birbirine çarpmasın
-        Physics2D.IgnoreLayerCollision(layerTeamA, layerTeamB, true);
-
-        // Spectator hiçbir şeye çarpmasın
-        if (layerSpectator != -1)
-        {
-            Physics2D.IgnoreLayerCollision(layerSpectator, layerTeamA, true);
-            Physics2D.IgnoreLayerCollision(layerSpectator, layerTeamB, true);
-        }
-
-        Debug.Log("Collision matrix yapılandırıldı: TeamA ve TeamB birbirine çarpmıyor.");
     }
 
     /// <summary>

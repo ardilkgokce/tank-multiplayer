@@ -1,5 +1,6 @@
 using UnityEngine;
 using Photon.Pun;
+using TankGame;
 
 namespace TankGame.Player
 {
@@ -14,6 +15,14 @@ namespace TankGame.Player
     {
         [Header("Movement Settings")]
         [SerializeField] private float moveSpeed = 5f;
+
+        [Header("Shooting Settings")]
+        [SerializeField] private Transform firePoint;
+        [SerializeField] private float fireRate = 0.5f;
+        [SerializeField] private string bulletPrefabName = "Bullet";
+
+        [Header("Tank Color")]
+        [SerializeField] private TankColor tankColor;
 
         [Header("Visual")]
         [SerializeField] private SpriteRenderer spriteRenderer;
@@ -32,6 +41,9 @@ namespace TankGame.Player
         // Network sync
         private Vector3 networkPosition;
         private float lerpSpeed = 10f;
+
+        // Shooting
+        private float nextFireTime = 0f;
 
         private void Awake()
         {
@@ -68,6 +80,9 @@ namespace TankGame.Player
 
             // Input al
             GetInput();
+
+            // Ateş etme kontrolü
+            HandleShooting();
         }
 
         private void FixedUpdate()
@@ -105,6 +120,47 @@ namespace TankGame.Player
             rb.velocity = movement;
         }
 
+        /// <summary>
+        /// Space tuşu ile ateş etme
+        /// </summary>
+        private void HandleShooting()
+        {
+            if (Input.GetKey(KeyCode.Space) && Time.time >= nextFireTime)
+            {
+                Fire();
+                nextFireTime = Time.time + fireRate;
+            }
+        }
+
+        /// <summary>
+        /// Mermi oluştur ve ateşle
+        /// </summary>
+        private void Fire()
+        {
+            if (firePoint == null)
+            {
+                Debug.LogWarning("FirePoint atanmamış!");
+                return;
+            }
+
+            // Bullet'ı network üzerinden oluştur
+            GameObject bullet = PhotonNetwork.Instantiate(bulletPrefabName, firePoint.position, Quaternion.identity);
+
+            // Bullet'a renk bilgisini gönder
+            TankBullet tankBullet = bullet.GetComponent<TankBullet>();
+            if (tankBullet != null)
+            {
+                tankBullet.SetColor(tankColor);
+            }
+        }
+
+        /// <summary>
+        /// Tank'ın rengini döndürür
+        /// </summary>
+        public TankColor GetTankColor()
+        {
+            return tankColor;
+        }
 
         #region IPunObservable Implementation
 

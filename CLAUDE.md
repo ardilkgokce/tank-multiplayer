@@ -4,144 +4,91 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Unity multiplayer game project using Photon Unity Networking (PUN). The project is built with Unity 2021.3.45f2 and uses the Universal Render Pipeline (URP) with 2D features enabled.
+A 2D multiplayer tank game built with Unity 2021.3.45f2 and Photon Unity Networking (PUN). Features team-based gameplay with 2 teams (5 players each) and spectator support (2 spectators max).
 
-**Project Name:** tank-multiplayer
 **Unity Version:** 2021.3.45f2
-**Rendering Pipeline:** Universal Render Pipeline (URP) 12.1.15
-**Primary Framework:** Photon Unity Networking (PUN)
+**Rendering:** Universal Render Pipeline (URP) 12.1.15 with 2D Renderer
 
-## Architecture
+## Game Architecture
+
+### Scene Flow
+```
+MenuScene → LobbyPanel (in MenuScene) → GameScene
+```
+
+1. **MenuScene**: Connection to Photon, automatic room join/create
+2. **LobbyPanel**: Team selection, player ready system, game start (Master Client only)
+3. **GameScene**: Actual gameplay with team-based spawning
 
 ### Networking Architecture
-The project uses Photon Unity Networking (PUN) for multiplayer functionality:
-- **Photon Realtime** - Core networking layer for real-time multiplayer communication
-- **PhotonUnityNetworking** - Unity-specific PUN implementation with MonoBehaviour integration
-- **PhotonChat** - Separate chat functionality layer
-- **PhotonView** - Component for synchronizing GameObjects across the network
 
-### Key Photon Components
-- `PhotonServerSettings.asset` - Network configuration (AppIDs, regions, protocol settings) located at `Assets/Photon/PhotonUnityNetworking/Resources/`
-- `MonoBehaviourPunCallbacks` - Base class for scripts that need to respond to Photon callbacks
-- `PhotonNetwork` - Static class providing access to all networking functionality
-- `PhotonView` - Component that enables network synchronization for GameObjects
+The game uses Photon Custom Properties for player state synchronization:
 
-### Project Structure
-```
-Assets/
-├── Photon/                          # Photon networking SDK
-│   ├── PhotonUnityNetworking/       # PUN main implementation
-│   │   ├── Code/                    # Core PUN scripts
-│   │   ├── Demos/                   # Example implementations
-│   │   │   ├── PunBasics-Tutorial/  # Basic multiplayer tutorial
-│   │   │   ├── DemoAsteroids/       # Asteroids multiplayer demo
-│   │   │   ├── DemoSlotRacer/       # Slot car racing demo
-│   │   │   ├── DemoProcedural/      # Procedural generation demo
-│   │   │   └── PunCockpit/          # Debug/testing tool
-│   │   └── Resources/               # PhotonServerSettings.asset
-│   ├── PhotonRealtime/              # Core realtime networking
-│   ├── PhotonChat/                  # Chat functionality
-│   └── PhotonLibs/                  # Native libraries
-├── Scenes/                          # Game scenes
-│   └── SampleScene.unity
-└── Settings/                        # URP settings and templates
-```
-
-## Development Commands
-
-### Opening the Project
-- Open the project in Unity Hub and launch with Unity 2021.3.45f2
-- The project uses Visual Studio or Rider as the IDE (configured in preferences)
-
-### Building
-- **Build for development:** File → Build Settings → Build (Unity Editor)
-- **Build for production:** File → Build Settings → Build (ensure "Development Build" is unchecked)
-
-### Running the Game
-- Press the Play button in Unity Editor to test in Play Mode
-- For multiplayer testing, build a standalone executable and run alongside the Unity Editor
-
-### Testing Multiplayer Locally
-1. Build a standalone player (File → Build Settings → Build)
-2. Run the built executable
-3. Press Play in Unity Editor
-4. Both instances should connect to the same Photon room
-
-## Photon Integration Patterns
-
-### Creating Network Objects
-Use `PhotonNetwork.Instantiate()` instead of Unity's `Instantiate()`:
 ```csharp
-PhotonNetwork.Instantiate(prefabName, position, rotation, 0);
-```
-Prefabs must be in a `Resources/` folder to be instantiated over the network.
-
-### Network Synchronization
-- Add `PhotonView` component to GameObjects that need network sync
-- Implement `IPunObservable` interface for custom serialization
-- Use `PhotonTransformView` for position/rotation sync
-- Use `PhotonRigidbodyView` or `PhotonRigidbody2DView` for physics sync
-
-### RPC Calls
-```csharp
-[PunRPC]
-void MyRpcMethod(params)
-{
-    // Method implementation
-}
-
-// Call the RPC
-photonView.RPC("MyRpcMethod", RpcTarget.All, params);
+// PlayerInfo.cs - Key constants
+PLAYER_NAME, TEAM_ID, ROLE, IS_READY, TANK_COLOR_INDEX
 ```
 
-### Connection Flow
-1. Connect to Photon: `PhotonNetwork.ConnectUsingSettings()`
-2. Join/Create Room: `PhotonNetwork.JoinRandomRoom()` or `PhotonNetwork.CreateRoom()`
-3. Spawn player: `PhotonNetwork.Instantiate()` in room
-4. Leave room: `PhotonNetwork.LeaveRoom()`
+**Connection Flow:**
+- `NetworkManager` (MenuScene): Connects to Photon, auto-joins/creates room
+- `LobbyManager` (MenuScene): Manages team selection and ready state
+- `TankGameManager` (GameScene): Spawns players based on their team/role
 
-### Callbacks
-Inherit from `MonoBehaviourPunCallbacks` and override relevant methods:
-- `OnConnectedToMaster()` - Connected to Photon Cloud
-- `OnJoinedRoom()` - Successfully joined a room
-- `OnPlayerEnteredRoom()` - Another player joined
-- `OnPlayerLeftRoom()` - Another player left
+### Team System
 
-## Important Unity-Specific Notes
+- **Team A** (TEAM_ID = 0): Spawns at y=0 area, uses green layer color
+- **Team B** (TEAM_ID = 1): Spawns at y=-100 area, uses blue layer color
+- Teams cannot see each other (camera culling mask per team)
+- Teams cannot collide (Physics2D layer collision matrix)
 
-### Script Compilation
-- Unity automatically compiles C# scripts when they're saved
-- Compilation errors prevent entering Play Mode
-- Check the Console window for compilation errors
+**Required Unity Layers** (must exist in Editor):
+- `TeamA`
+- `TeamB`
+- `Spectator`
 
-### Scene Management
-- Changes to scenes must be saved (Ctrl+S or File → Save)
-- Scene changes in Play Mode are lost when exiting Play Mode
+### Script Responsibilities
 
-### Prefab Workflow
-- Apply changes to prefab instances using the "Apply" button in the Inspector
-- Breaking prefab connections should be done intentionally
+| Script | Location | Purpose |
+|--------|----------|---------|
+| `NetworkManager` | Networking/ | Photon connection and room management |
+| `LobbyManager` | Networking/ | Team selection UI, ready system |
+| `TankGameManager` | Networking/ | Player spawning based on team/role |
+| `TeamManager` | Networking/ | Layer assignment, camera culling, collision config |
+| `PlayerInfo` | Networking/ | Static helper for Photon Custom Properties |
+| `TankController` | Player/ | Tank movement with network sync (IPunObservable) |
+| `CameraFollow` | Player/ | Smooth camera following for players |
+| `SpectatorController` | Player/ | Spectator camera with player switching |
 
-### Universal Render Pipeline
-- Graphics settings are in `Assets/Settings/UniversalRP.asset`
-- 2D Renderer configuration is in `Assets/Settings/Renderer2D.asset`
-- Shaders and materials must be URP-compatible
+### Namespaces
+- `TankGame.Networking` - Network-related classes
+- `TankGame.Player` - Player control classes
+- Root namespace - `PlayerInfo`, `LobbyManager`, `TeamManager`
 
 ## Key Files
 
-- `Packages/manifest.json` - Unity package dependencies
-- `ProjectSettings/ProjectSettings.asset` - Project configuration
-- `Assets/Photon/PhotonUnityNetworking/Resources/PhotonServerSettings.asset` - Photon network configuration
-- `Assets/Settings/UniversalRP.asset` - URP graphics settings
+### Network Prefabs (must be in Resources/)
+Tank prefabs are color-coded and located at `Assets/Prefabs/Resources/`:
+- `Tank_Green`, `Tank_Grey`, `Tank_Orange`, `Tank_Purple`, `Tank_Yellow`
+- `SpectatorCamera`
 
-## Dependencies
+### Configuration
+- `Assets/Photon/PhotonUnityNetworking/Resources/PhotonServerSettings.asset` - Photon AppID and region
 
-The project uses these Unity packages:
-- com.unity.render-pipelines.universal (12.1.15) - Universal Render Pipeline
-- com.unity.textmeshpro (3.0.6) - Text rendering
-- com.unity.timeline (1.6.5) - Animation sequencing
-- com.unity.feature.2d (2.0.1) - 2D game features
-- com.unity.test-framework (1.1.33) - Unit testing
+## Development
 
-External dependencies:
-- Photon Unity Networking (included in Assets/Photon/)
+### Testing Multiplayer Locally
+Use **ParrelSync** (included in project) to create project clones:
+1. Window → ParrelSync → Clones Manager
+2. Create a clone
+3. Open clone in separate Unity Editor instance
+4. Run both editors simultaneously
+
+### Adding New Tank Features
+1. Modify `TankController.cs` for behavior
+2. Update prefabs in `Assets/Prefabs/Resources/`
+3. Ensure changes sync via `OnPhotonSerializeView` if network-relevant
+
+### Adding New Player Properties
+1. Add constant key in `PlayerInfo.cs`
+2. Update `SetPlayerProperties()` method
+3. Add getter method following existing pattern

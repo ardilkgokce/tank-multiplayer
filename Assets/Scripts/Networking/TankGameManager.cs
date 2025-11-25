@@ -159,9 +159,10 @@ namespace TankGame.Networking
 
             if (spawnPoints != null && spawnPoints.Length > 0)
             {
-                // Takımdaki oyuncu sayısına göre spawn point seç
-                int teamPlayerCount = PlayerInfo.GetTeamPlayerCount(teamID, PlayerInfo.ROLE_PLAYER);
-                int spawnIndex = Mathf.Clamp(teamPlayerCount - 1, 0, spawnPoints.Length - 1);
+                // Oyuncunun TankColorIndex'ini spawn index olarak kullan
+                // Bu değer lobby'de her oyuncu için benzersiz atanıyor (0, 1, 2, 3, 4)
+                int tankColorIndex = PlayerInfo.GetTankColorIndex(PhotonNetwork.LocalPlayer);
+                int spawnIndex = Mathf.Clamp(tankColorIndex, 0, spawnPoints.Length - 1);
 
                 if (spawnPoints[spawnIndex] != null)
                 {
