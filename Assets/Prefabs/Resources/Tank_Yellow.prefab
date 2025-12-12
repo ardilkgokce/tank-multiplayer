@@ -195,6 +195,7 @@ MonoBehaviour:
   bulletPrefabName: Bullet
   tankColor: 4
   spriteRenderer: {fileID: 216718495533135754}
+  testMode: 1
 --- !u!1 &1795661974529255337
 GameObject:
   m_ObjectHideFlags: 0

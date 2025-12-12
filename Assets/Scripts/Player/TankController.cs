@@ -27,6 +27,10 @@ namespace TankGame.Player
         [Header("Visual")]
         [SerializeField] private SpriteRenderer spriteRenderer;
 
+        [Header("Test Mode")]
+        [Tooltip("Aktifken tüm bullet'lar tüm renklerdeki kutuları yok edebilir")]
+        [SerializeField] private bool testMode = false;
+
         // Components
         private Rigidbody2D rb;
         private PhotonView pv;
@@ -62,6 +66,12 @@ namespace TankGame.Player
                 teamID = PlayerInfo.GetTeamID(pv.Owner);
                 playerName = PlayerInfo.GetPlayerName(pv.Owner);
                 Debug.Log($"Tank başlatıldı: {playerName} - {PlayerInfo.GetTeamName(teamID)} - IsMine: {pv.IsMine}");
+            }
+
+            // Test modunu static değişkene aktar (sadece kendi tankımız için)
+            if (pv.IsMine)
+            {
+                TankBullet.TestMode = testMode;
             }
 
             // Sprite rengi zaten prefab'da tanımlı (Tank_Green, Tank_Purple vb.)
@@ -144,14 +154,9 @@ namespace TankGame.Player
             }
 
             // Bullet'ı network üzerinden oluştur
-            GameObject bullet = PhotonNetwork.Instantiate(bulletPrefabName, firePoint.position, Quaternion.identity);
-
-            // Bullet'a renk bilgisini gönder
-            TankBullet tankBullet = bullet.GetComponent<TankBullet>();
-            if (tankBullet != null)
-            {
-                tankBullet.SetColor(tankColor);
-            }
+            // Renk bilgisini instantiation data olarak gönder (RPC race condition önlenir)
+            object[] instantiationData = new object[] { (int)tankColor };
+            PhotonNetwork.Instantiate(bulletPrefabName, firePoint.position, Quaternion.identity, 0, instantiationData);
         }
 
         /// <summary>

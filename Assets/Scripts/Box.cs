@@ -21,30 +21,22 @@ namespace TankGame
         }
 
         /// <summary>
-        /// Box'ı yok eder (RPC ile tüm clientlarda)
+        /// Box'ı yok eder (tüm clientlarda aynı anda)
+        /// Scene object olduğu için normal Destroy kullanılır
         /// </summary>
         [PunRPC]
         public void DestroyBox()
         {
-            if (photonView.IsMine)
-            {
-                PhotonNetwork.Destroy(gameObject);
-            }
+            Destroy(gameObject);
         }
 
         /// <summary>
         /// Box'ı yok etmek için çağrılır
+        /// Tüm clientlara RPC gönderir
         /// </summary>
         public void RequestDestroy()
         {
-            if (PhotonNetwork.IsMasterClient)
-            {
-                PhotonNetwork.Destroy(gameObject);
-            }
-            else
-            {
-                photonView.RPC(nameof(DestroyBox), RpcTarget.MasterClient);
-            }
+            photonView.RPC(nameof(DestroyBox), RpcTarget.All);
         }
     }
 }

@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(findstr:*)",
-      "Bash(dir /B \"C:\\Users\\ardil\\Unity Projects\\tank-multiplayer\\Assets\")"
+      "Bash(dir /B \"C:\\Users\\ardil\\Unity Projects\\tank-multiplayer\\Assets\")",
+      "Bash(dir:*)",
+      "Bash(powershell -Command:*)"
     ],
     "deny": [],
     "ask": []
