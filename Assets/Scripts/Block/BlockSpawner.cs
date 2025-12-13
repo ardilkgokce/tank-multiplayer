@@ -1,0 +1,170 @@
+using UnityEngine;
+using Photon.Pun;
+using System.Collections.Generic;
+
+namespace TankGame.Block
+{
+    /// <summary>
+    /// Blokları belirli aralıklarla spawn eder
+    /// Master Client spawn işlemini yapar, tüm clientlara senkronize olur
+    /// Her iki takım için aynı blok aynı anda spawn edilir
+    /// </summary>
+    public class BlockSpawner : MonoBehaviourPun
+    {
+        [Header("Spawn Points")]
+        [Tooltip("Takım A için spawn noktası")]
+        [SerializeField] private Transform spawnPointTeamA;
+        [Tooltip("Takım B için spawn noktası")]
+        [SerializeField] private Transform spawnPointTeamB;
+
+        [Header("Block Prefabs")]
+        [Tooltip("Spawn edilecek blok prefab isimleri (Resources klasöründe olmalı)")]
+        [SerializeField] private List<string> blockPrefabNames = new List<string>();
+
+        [Header("Spawn Settings")]
+        [Tooltip("İlk spawn'dan önce bekleme süresi")]
+        [SerializeField] private float initialDelay = 3f;
+        [Tooltip("İki spawn arasındaki süre (saniye)")]
+        [SerializeField] private float spawnInterval = 4f;
+        [Tooltip("Blokların hareket hızı")]
+        [SerializeField] private float blockSpeed = 5f;
+
+        [Header("Destroy Settings")]
+        [Tooltip("Bu X pozisyonunun soluna geçince blok yok edilir")]
+        [SerializeField] private float destroyXPosition = -50f;
+
+        // Şu anki prefab index'i (sırayla spawn için)
+        private int currentPrefabIndex = 0;
+        private float nextSpawnTime;
+        private bool isSpawning = false;
+
+        private void Start()
+        {
+            // Sadece Master Client spawn işlemini başlatsın
+            if (PhotonNetwork.IsMasterClient)
+            {
+                nextSpawnTime = Time.time + initialDelay;
+                isSpawning = true;
+                Debug.Log($"BlockSpawner başlatıldı. İlk spawn: {initialDelay} saniye sonra");
+            }
+        }
+
+        private void Update()
+        {
+            // Sadece Master Client spawn yapsın
+            if (!PhotonNetwork.IsMasterClient || !isSpawning) return;
+
+            // Spawn zamanı geldiyse
+            if (Time.time >= nextSpawnTime)
+            {
+                SpawnBlock();
+                nextSpawnTime = Time.time + spawnInterval;
+            }
+        }
+
+        /// <summary>
+        /// Her iki takım için blok spawn eder
+        /// </summary>
+        private void SpawnBlock()
+        {
+            if (blockPrefabNames.Count == 0)
+            {
+                Debug.LogWarning("BlockSpawner: Prefab listesi boş!");
+                return;
+            }
+
+            string prefabName = blockPrefabNames[currentPrefabIndex];
+
+            // Takım A için spawn
+            if (spawnPointTeamA != null)
+            {
+                SpawnBlockAtPosition(prefabName, spawnPointTeamA.position);
+            }
+
+            // Takım B için spawn
+            if (spawnPointTeamB != null)
+            {
+                SpawnBlockAtPosition(prefabName, spawnPointTeamB.position);
+            }
+
+            // Sonraki prefab'a geç (sırayla)
+            currentPrefabIndex = (currentPrefabIndex + 1) % blockPrefabNames.Count;
+
+            Debug.Log($"Blok spawn edildi: {prefabName} (Index: {currentPrefabIndex})");
+        }
+
+        /// <summary>
+        /// Belirtilen pozisyonda blok spawn eder
+        /// </summary>
+        private void SpawnBlockAtPosition(string prefabName, Vector3 position)
+        {
+            // Hız ve destroy pozisyonunu instantiation data olarak gönder
+            object[] instantiationData = new object[] { blockSpeed, destroyXPosition };
+
+            // Network üzerinden spawn et
+            PhotonNetwork.Instantiate(prefabName, position, Quaternion.identity, 0, instantiationData);
+        }
+
+        /// <summary>
+        /// Spawn işlemini durdurur
+        /// </summary>
+        public void StopSpawning()
+        {
+            isSpawning = false;
+        }
+
+        /// <summary>
+        /// Spawn işlemini başlatır
+        /// </summary>
+        public void StartSpawning()
+        {
+            if (PhotonNetwork.IsMasterClient)
+            {
+                isSpawning = true;
+                nextSpawnTime = Time.time + spawnInterval;
+            }
+        }
+
+        /// <summary>
+        /// Spawn aralığını değiştirir
+        /// </summary>
+        public void SetSpawnInterval(float interval)
+        {
+            spawnInterval = interval;
+        }
+
+        /// <summary>
+        /// Blok hızını değiştirir
+        /// </summary>
+        public void SetBlockSpeed(float speed)
+        {
+            blockSpeed = speed;
+        }
+
+        #region Debug Helpers
+
+        private void OnDrawGizmos()
+        {
+            // Spawn noktalarını göster
+            Gizmos.color = Color.green;
+            if (spawnPointTeamA != null)
+            {
+                Gizmos.DrawWireCube(spawnPointTeamA.position, new Vector3(2f, 10f, 0f));
+                Gizmos.DrawLine(spawnPointTeamA.position, spawnPointTeamA.position + Vector3.left * 20f);
+            }
+
+            Gizmos.color = Color.blue;
+            if (spawnPointTeamB != null)
+            {
+                Gizmos.DrawWireCube(spawnPointTeamB.position, new Vector3(2f, 10f, 0f));
+                Gizmos.DrawLine(spawnPointTeamB.position, spawnPointTeamB.position + Vector3.left * 20f);
+            }
+
+            // Destroy pozisyonunu göster
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(new Vector3(destroyXPosition, -200f, 0f), new Vector3(destroyXPosition, 200f, 0f));
+        }
+
+        #endregion
+    }
+}
