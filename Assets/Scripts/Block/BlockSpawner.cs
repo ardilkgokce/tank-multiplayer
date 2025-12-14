@@ -21,6 +21,10 @@ namespace TankGame.Block
         [Tooltip("Spawn edilecek blok prefab isimleri (Resources klasöründe olmalı)")]
         [SerializeField] private List<string> blockPrefabNames = new List<string>();
 
+        [Header("Finish Line")]
+        [Tooltip("Finish Line prefab ismi (Resources klasöründe olmalı)")]
+        [SerializeField] private string finishLinePrefabName = "FinishLine";
+
         [Header("Spawn Settings")]
         [Tooltip("İlk spawn'dan önce bekleme süresi")]
         [SerializeField] private float initialDelay = 3f;
@@ -33,10 +37,15 @@ namespace TankGame.Block
         [Tooltip("Bu X pozisyonunun soluna geçince blok yok edilir")]
         [SerializeField] private float destroyXPosition = -50f;
 
+        [Header("Finish Line Settings")]
+        [Tooltip("Finish için gerekli tank sayısı (takım başına)")]
+        [SerializeField] private int requiredTankCount = 5;
+
         // Şu anki prefab index'i (sırayla spawn için)
         private int currentPrefabIndex = 0;
         private float nextSpawnTime;
         private bool isSpawning = false;
+        private bool finishLineSpawned = false;
 
         private void Start()
         {
@@ -64,6 +73,7 @@ namespace TankGame.Block
 
         /// <summary>
         /// Her iki takım için blok spawn eder
+        /// Tüm bloklar spawn edildikten sonra FinishLine spawn eder
         /// </summary>
         private void SpawnBlock()
         {
@@ -87,10 +97,46 @@ namespace TankGame.Block
                 SpawnBlockAtPosition(prefabName, spawnPointTeamB.position);
             }
 
-            // Sonraki prefab'a geç (sırayla)
-            currentPrefabIndex = (currentPrefabIndex + 1) % blockPrefabNames.Count;
+            Debug.Log($"Blok spawn edildi: {prefabName} (Index: {currentPrefabIndex + 1}/{blockPrefabNames.Count})");
 
-            Debug.Log($"Blok spawn edildi: {prefabName} (Index: {currentPrefabIndex})");
+            // Sonraki prefab'a geç
+            currentPrefabIndex++;
+
+            // Tüm bloklar spawn edildiyse, bir sonraki spawn zamanında FinishLine spawn et
+            if (currentPrefabIndex >= blockPrefabNames.Count)
+            {
+                isSpawning = false;
+                Invoke(nameof(SpawnFinishLine), spawnInterval);
+            }
+        }
+
+        /// <summary>
+        /// Her iki takım için FinishLine spawn eder
+        /// </summary>
+        private void SpawnFinishLine()
+        {
+            if (finishLineSpawned) return;
+            if (string.IsNullOrEmpty(finishLinePrefabName)) return;
+
+            finishLineSpawned = true;
+            isSpawning = false;
+
+            // Takım A için FinishLine spawn
+            // [0] = moveSpeed, [1] = destroyXPosition, [2] = requiredTankCount, [3] = teamId
+            if (spawnPointTeamA != null)
+            {
+                object[] dataTeamA = new object[] { blockSpeed, destroyXPosition, requiredTankCount, 0 };
+                PhotonNetwork.Instantiate(finishLinePrefabName, spawnPointTeamA.position, Quaternion.identity, 0, dataTeamA);
+            }
+
+            // Takım B için FinishLine spawn
+            if (spawnPointTeamB != null)
+            {
+                object[] dataTeamB = new object[] { blockSpeed, destroyXPosition, requiredTankCount, 1 };
+                PhotonNetwork.Instantiate(finishLinePrefabName, spawnPointTeamB.position, Quaternion.identity, 0, dataTeamB);
+            }
+
+            Debug.Log("FinishLine spawn edildi! Blok spawning durdu.");
         }
 
         /// <summary>

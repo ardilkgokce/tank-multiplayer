@@ -1473,10 +1473,12 @@ MonoBehaviour:
   - Block_6
   - Block_7
   - Block_8
+  finishLinePrefabName: FinishLine
   initialDelay: 3
   spawnInterval: 10
   blockSpeed: 2
   destroyXPosition: -50
+  requiredTankCount: 5
 --- !u!4 &1034292256
 Transform:
   m_ObjectHideFlags: 0
@@ -2097,7 +2099,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: -1
+  m_SortingOrder: -3
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
