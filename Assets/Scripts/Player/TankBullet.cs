@@ -1,6 +1,7 @@
 using UnityEngine;
 using Photon.Pun;
 using TankGame;
+using TankGame.Score;
 
 namespace TankGame.Player
 {
@@ -84,6 +85,14 @@ namespace TankGame.Player
                 {
                     // Box ve bullet yok olsun
                     box.RequestDestroy();
+
+                    // Skor ekle (bullet sahibinin takımına)
+                    int teamId = PlayerInfo.GetTeamID(photonView.Owner);
+                    if (ScoreManager.Instance != null)
+                    {
+                        ScoreManager.Instance.AddScore(teamId);
+                    }
+
                     isDestroyed = true;
                     PhotonNetwork.Destroy(gameObject);
                 }

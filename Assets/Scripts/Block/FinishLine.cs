@@ -41,9 +41,12 @@ namespace TankGame.Block
                 destroyXPosition = (float)photonView.InstantiationData[1];
                 requiredTankCount = (int)photonView.InstantiationData[2];
                 teamId = (int)photonView.InstantiationData[3];
+                Debug.Log($"FinishLine başlatıldı. TeamId: {teamId}, Gereken tank: {requiredTankCount}");
             }
-
-            Debug.Log($"FinishLine başlatıldı. TeamId: {teamId}, Gereken tank: {requiredTankCount}");
+            else
+            {
+                Debug.LogWarning($"FinishLine: InstantiationData null veya eksik! Varsayılan değerler kullanılıyor. Data: {photonView.InstantiationData?.Length ?? 0}");
+            }
         }
 
         private void Update()

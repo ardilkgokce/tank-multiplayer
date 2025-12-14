@@ -121,6 +121,8 @@ namespace TankGame.Block
             finishLineSpawned = true;
             isSpawning = false;
 
+            Debug.Log($"FinishLine spawn ediliyor. RequiredTankCount: {requiredTankCount}");
+
             // Takım A için FinishLine spawn
             // [0] = moveSpeed, [1] = destroyXPosition, [2] = requiredTankCount, [3] = teamId
             if (spawnPointTeamA != null)
