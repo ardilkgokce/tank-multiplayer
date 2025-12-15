@@ -25,8 +25,8 @@ namespace TankGame.Score
         [SerializeField] private TextMeshPro teamNameText;
 
         [Header("Format")]
-        [Tooltip("Skor format stringi. {0} = takım ismi, {1} = skor değeri")]
-        [SerializeField] private string scoreFormat = "{0}: {1}";
+        [Tooltip("Skor format stringi. {0} = skor değeri")]
+        [SerializeField] private string scoreFormat = "SKOR: {0}";
 
         private void Start()
         {
@@ -54,8 +54,7 @@ namespace TankGame.Score
         {
             if (scoreText != null)
             {
-                string teamName = PlayerInfo.GetCustomTeamName(teamId);
-                scoreText.text = string.Format(scoreFormat, teamName, score);
+                scoreText.text = string.Format(scoreFormat, score);
             }
         }
 

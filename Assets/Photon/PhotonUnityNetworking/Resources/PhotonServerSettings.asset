@@ -40,6 +40,7 @@ MonoBehaviour:
   - DestroySpaceship
   - Fire
   - RespawnSpaceship
+  - RPC_DamageFlash
   - RPC_ReloadScene
   - RPC_ShowFloatingText
   - RPC_StartGame
