@@ -1,6 +1,7 @@
 using UnityEngine;
 using Photon.Pun;
 using System.Collections.Generic;
+using TankGame.Game;
 
 namespace TankGame.Block
 {
@@ -8,6 +9,7 @@ namespace TankGame.Block
     /// Blokları belirli aralıklarla spawn eder
     /// Master Client spawn işlemini yapar, tüm clientlara senkronize olur
     /// Her iki takım için aynı blok aynı anda spawn edilir
+    /// Oyun başlayana kadar spawn yapmaz
     /// </summary>
     public class BlockSpawner : MonoBehaviourPun
     {
@@ -49,13 +51,9 @@ namespace TankGame.Block
 
         private void Start()
         {
-            // Sadece Master Client spawn işlemini başlatsın
-            if (PhotonNetwork.IsMasterClient)
-            {
-                nextSpawnTime = Time.time + initialDelay;
-                isSpawning = true;
-                Debug.Log($"BlockSpawner başlatıldı. İlk spawn: {initialDelay} saniye sonra");
-            }
+            // Başlangıçta spawn yapma, GameController.StartSpawning() ile başlatılacak
+            isSpawning = false;
+            Debug.Log("BlockSpawner başlatıldı. Oyun başlayana kadar bekleniyor...");
         }
 
         private void Update()
@@ -168,8 +166,13 @@ namespace TankGame.Block
         {
             if (PhotonNetwork.IsMasterClient)
             {
+                // Sahne yenilendiğinde sıfırla
+                currentPrefabIndex = 0;
+                finishLineSpawned = false;
+
                 isSpawning = true;
-                nextSpawnTime = Time.time + spawnInterval;
+                nextSpawnTime = Time.time + initialDelay;
+                Debug.Log($"BlockSpawner spawn başlatıldı. İlk spawn: {initialDelay} saniye sonra");
             }
         }
 

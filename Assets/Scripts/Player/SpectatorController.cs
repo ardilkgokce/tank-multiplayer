@@ -5,7 +5,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using PhotonPlayer = Photon.Realtime.Player;
 
-namespace TankGame.Player
+namespace TankGame.Tank
 {
     /// <summary>
     /// İzleyici (spectator) kamera kontrolü.

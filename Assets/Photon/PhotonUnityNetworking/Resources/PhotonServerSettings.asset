@@ -41,6 +41,8 @@ MonoBehaviour:
   - RespawnSpaceship
   - DestroyBox
   - RPC_SetColor
+  - RPC_ReloadScene
+  - RPC_StartGame
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

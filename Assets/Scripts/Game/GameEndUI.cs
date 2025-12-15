@@ -7,7 +7,8 @@ namespace TankGame.Game
 {
     /// <summary>
     /// Oyun sonu ekranı
-    /// Kazandınız/Kaybettiniz gösterimi ve skor tablosu
+    /// Takım ismiyle kazanan gösterimi ve skor tablosu
+    /// F5 ile sahne yenileme ipucu gösterir
     /// </summary>
     public class GameEndUI : MonoBehaviour
     {
@@ -16,6 +17,7 @@ namespace TankGame.Game
 
         [Header("Result Display")]
         [SerializeField] private TextMeshProUGUI resultText;
+        [SerializeField] private TextMeshProUGUI winnerTeamText;
         [SerializeField] private TextMeshProUGUI teamAScoreText;
         [SerializeField] private TextMeshProUGUI teamBScoreText;
 
@@ -29,8 +31,8 @@ namespace TankGame.Game
         [SerializeField] private string loseMessage = "KAYBETTİNİZ!";
         [SerializeField] private string drawMessage = "BERABERE!";
 
-        [Header("Buttons")]
-        [SerializeField] private Button returnToLobbyButton;
+        [Header("Hint")]
+        [SerializeField] private TextMeshProUGUI hintText;
 
         private void Start()
         {
@@ -42,12 +44,6 @@ namespace TankGame.Game
 
             // Event'e subscribe ol
             GameSessionManager.OnGameEnded += OnGameEnded;
-
-            // Buton ayarla
-            if (returnToLobbyButton != null)
-            {
-                returnToLobbyButton.onClick.AddListener(OnReturnToLobbyClicked);
-            }
         }
 
         private void OnDestroy()
@@ -73,6 +69,19 @@ namespace TankGame.Game
 
             // Sonuç mesajını ayarla
             SetResultDisplay(winnerTeamId, myTeamId, teamAScore, teamBScore);
+
+            // Hint göster
+            if (hintText != null)
+            {
+                if (PhotonNetwork.IsMasterClient)
+                {
+                    hintText.text = "Yeni oyun için F5 tuşuna basın";
+                }
+                else
+                {
+                    hintText.text = "Oda sahibi yeni oyun başlatabilir";
+                }
+            }
         }
 
         /// <summary>
@@ -80,6 +89,10 @@ namespace TankGame.Game
         /// </summary>
         private void SetResultDisplay(int winnerTeamId, int myTeamId, int teamAScore, int teamBScore)
         {
+            // Takım isimlerini al
+            string teamAName = PlayerInfo.GetCustomTeamName(PlayerInfo.TEAM_A);
+            string teamBName = PlayerInfo.GetCustomTeamName(PlayerInfo.TEAM_B);
+
             if (resultText != null)
             {
                 // Beraberlik kontrolü
@@ -101,32 +114,31 @@ namespace TankGame.Game
                 }
             }
 
-            // Skorları göster
+            // Kazanan takım ismini göster
+            if (winnerTeamText != null)
+            {
+                if (winnerTeamId == -1 || teamAScore == teamBScore)
+                {
+                    winnerTeamText.text = "";
+                }
+                else
+                {
+                    string winnerName = winnerTeamId == 0 ? teamAName : teamBName;
+                    winnerTeamText.text = $"Kazanan: {winnerName}";
+                    winnerTeamText.color = winColor;
+                }
+            }
+
+            // Skorları takım isimleriyle göster
             if (teamAScoreText != null)
             {
-                teamAScoreText.text = $"Takım A: {teamAScore}";
+                teamAScoreText.text = $"{teamAName}: {teamAScore}";
             }
 
             if (teamBScoreText != null)
             {
-                teamBScoreText.text = $"Takım B: {teamBScore}";
+                teamBScoreText.text = $"{teamBName}: {teamBScore}";
             }
-        }
-
-        /// <summary>
-        /// Lobiye dön butonuna tıklandığında
-        /// </summary>
-        private void OnReturnToLobbyClicked()
-        {
-            PhotonNetwork.LeaveRoom();
-        }
-
-        /// <summary>
-        /// Lobiye dönüş sonrası MenuScene'e geç
-        /// </summary>
-        public void OnLeftRoom()
-        {
-            PhotonNetwork.LoadLevel("MenuScene");
         }
     }
 }

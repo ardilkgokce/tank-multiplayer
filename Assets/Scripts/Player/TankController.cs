@@ -1,13 +1,16 @@
 using UnityEngine;
 using Photon.Pun;
 using TankGame;
+using TankGame.Game;
+using TankGame.MobileInput;
 
-namespace TankGame.Player
+namespace TankGame.Tank
 {
     /// <summary>
     /// Tank hareketi ve kontrolü
-    /// WASD veya Arrow keys ile 2D hareket
+    /// WASD veya Arrow keys ile 2D hareket + Joystick desteği (mobil)
     /// Sadece kendi tankını kontrol eder (photonView.IsMine)
+    /// Oyun başlayana kadar hareket ve ateş etme devre dışı
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(PhotonView))]
@@ -48,6 +51,13 @@ namespace TankGame.Player
 
         // Shooting
         private float nextFireTime = 0f;
+        private bool fireButtonPressed = false;
+
+        // Game state
+        private bool canMove = false;
+
+        // Joystick reference (runtime'da atanır)
+        private Joystick movementJoystick;
 
         private void Awake()
         {
@@ -76,6 +86,60 @@ namespace TankGame.Player
 
             // Sprite rengi zaten prefab'da tanımlı (Tank_Green, Tank_Purple vb.)
             // Layer assignment TankGameManager tarafından yapılıyor
+
+            // Oyun başlama event'ine subscribe ol
+            GameController.OnGameStarted += OnGameStarted;
+
+            // Oyun zaten başlamışsa hareket aktif
+            if (GameController.Instance != null && GameController.Instance.IsGameStarted())
+            {
+                canMove = true;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            GameController.OnGameStarted -= OnGameStarted;
+        }
+
+        private void OnGameStarted()
+        {
+            canMove = true;
+            Debug.Log($"Tank hareket aktif: {playerName}");
+
+            // Kendi tankımızsa joystick'i bul ve aktif et
+            if (pv.IsMine)
+            {
+                // MobileInputManager varsa joystick'i al
+                if (MobileInputManager.Instance != null)
+                {
+                    movementJoystick = MobileInputManager.Instance.GetMovementJoystick();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Joystick referansını ayarlar (MobileInputManager tarafından çağrılır)
+        /// </summary>
+        public void SetJoystick(Joystick joystick)
+        {
+            movementJoystick = joystick;
+        }
+
+        /// <summary>
+        /// Fire butonundan ateş tetiklenir (UI Button tarafından çağrılır)
+        /// </summary>
+        public void OnFireButtonDown()
+        {
+            fireButtonPressed = true;
+        }
+
+        /// <summary>
+        /// Fire butonu bırakıldığında (UI Button tarafından çağrılır)
+        /// </summary>
+        public void OnFireButtonUp()
+        {
+            fireButtonPressed = false;
         }
 
         private void Update()
@@ -85,6 +149,13 @@ namespace TankGame.Player
             {
                 // Diğer oyuncuların tanklarını smooth şekilde senkronize et
                 transform.position = Vector3.Lerp(transform.position, networkPosition, Time.deltaTime * lerpSpeed);
+                return;
+            }
+
+            // Oyun başlamadıysa kontrolleri devre dışı bırak
+            if (!canMove)
+            {
+                rb.velocity = Vector2.zero;
                 return;
             }
 
@@ -101,20 +172,36 @@ namespace TankGame.Player
             if (!pv.IsMine)
                 return;
 
+            // Oyun başlamadıysa hareket etme
+            if (!canMove)
+                return;
+
             // Hareketi uygula
             ApplyMovement();
         }
 
         /// <summary>
-        /// WASD veya Arrow keys input'unu al
+        /// WASD/Arrow keys + Joystick input'unu al
         /// </summary>
         private void GetInput()
         {
-            // Horizontal (A/D veya Left/Right)
+            // Önce klavye input'unu al (WASD veya Arrow keys) - test için
             float horizontal = Input.GetAxisRaw("Horizontal");
-
-            // Vertical (W/S veya Up/Down)
             float vertical = Input.GetAxisRaw("Vertical");
+
+            // Eğer joystick varsa ve kullanılıyorsa, joystick input'unu ekle
+            if (movementJoystick != null)
+            {
+                // Joystick input'u klavye input'unun üzerine ekle (hangisi daha büyükse o kullanılır)
+                float joystickH = movementJoystick.Horizontal;
+                float joystickV = movementJoystick.Vertical;
+
+                // Joystick değerleri daha büyükse onları kullan
+                if (Mathf.Abs(joystickH) > Mathf.Abs(horizontal))
+                    horizontal = joystickH;
+                if (Mathf.Abs(joystickV) > Mathf.Abs(vertical))
+                    vertical = joystickV;
+            }
 
             // Movement input (yukarı/aşağı/sağ/sol)
             moveInput = new Vector2(horizontal, vertical).normalized;
@@ -131,11 +218,14 @@ namespace TankGame.Player
         }
 
         /// <summary>
-        /// Space tuşu ile ateş etme
+        /// Space tuşu veya Fire butonu ile ateş etme
         /// </summary>
         private void HandleShooting()
         {
-            if (Input.GetKey(KeyCode.Space) && Time.time >= nextFireTime)
+            // Klavye (Space) veya mobil fire butonu
+            bool shouldFire = Input.GetKey(KeyCode.Space) || fireButtonPressed;
+
+            if (shouldFire && Time.time >= nextFireTime)
             {
                 Fire();
                 nextFireTime = Time.time + fireRate;

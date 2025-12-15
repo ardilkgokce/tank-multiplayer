@@ -10,197 +10,208 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// <summary>
 /// Lobby ekranını yöneten sınıf.
-/// Oyuncu listesi, takım seçimi, hazır durumu ve oyun başlatma işlemlerini kontrol eder.
+/// 4 butonlu basit takım seçimi - herkes seçince Master Client GameScene'e yönlendirir.
 /// </summary>
 public class LobbyManager : MonoBehaviourPunCallbacks
 {
     [Header("UI References")]
-    [SerializeField] private TMP_InputField playerNameInput;
-    [SerializeField] private Toggle roleToggle; // True = Oyuncu, False = İzleyici
-    [SerializeField] private TMP_Text roleToggleLabel;
-    [SerializeField] private Button teamAButton;
-    [SerializeField] private Button teamBButton;
-    [SerializeField] private Button readyButton;
+    [SerializeField] private Button teamAPlayerButton;
+    [SerializeField] private Button teamBPlayerButton;
+    [SerializeField] private Button teamASpectatorButton;
+    [SerializeField] private Button teamBSpectatorButton;
     [SerializeField] private Button startGameButton;
-    [SerializeField] private TMP_Text selectedTeamText;
     [SerializeField] private TMP_Text statusText;
 
     [Header("Player Count UI")]
     [SerializeField] private TMP_Text teamACountText;
     [SerializeField] private TMP_Text teamBCountText;
-    [SerializeField] private TMP_Text spectatorCountText;
+    [SerializeField] private TMP_Text teamASpectatorCountText;
+    [SerializeField] private TMP_Text teamBSpectatorCountText;
+    [SerializeField] private TMP_Text selectedTeamText;
 
     [Header("Settings")]
     [SerializeField] private int maxPlayersPerTeam = 5;
-    [SerializeField] private int maxSpectators = 2;
+    [SerializeField] private int maxSpectatorsPerTeam = 1;
 
-    // Local player data
-    private string currentPlayerName = "";
-    private int currentTeamID = -1;
-    private string currentRole = PlayerInfo.ROLE_PLAYER;
-    private bool isReady = false;
+    // Local state
+    private bool hasSelectedTeam = false;
 
     private void Start()
     {
-        // UI başlangıç durumu
-        startGameButton.gameObject.SetActive(false);
-        readyButton.interactable = false;
-        selectedTeamText.text = "Takım seçilmedi";
-        statusText.text = "Lobby'ye hoş geldiniz!";
+        statusText.text = "Takımınızı seçin";
 
         // Button listeners
-        teamAButton.onClick.AddListener(() => SelectTeam(PlayerInfo.TEAM_A));
-        teamBButton.onClick.AddListener(() => SelectTeam(PlayerInfo.TEAM_B));
-        readyButton.onClick.AddListener(ToggleReady);
-        startGameButton.onClick.AddListener(StartGame);
-        playerNameInput.onValueChanged.AddListener(OnNameChanged);
-        roleToggle.onValueChanged.AddListener(OnRoleToggleChanged);
+        teamAPlayerButton.onClick.AddListener(() => SelectTeam(PlayerInfo.TEAM_A, PlayerInfo.ROLE_PLAYER));
+        teamBPlayerButton.onClick.AddListener(() => SelectTeam(PlayerInfo.TEAM_B, PlayerInfo.ROLE_PLAYER));
+        teamASpectatorButton.onClick.AddListener(() => SelectTeam(PlayerInfo.TEAM_A, PlayerInfo.ROLE_SPECTATOR));
+        teamBSpectatorButton.onClick.AddListener(() => SelectTeam(PlayerInfo.TEAM_B, PlayerInfo.ROLE_SPECTATOR));
 
-        // Default role
-        roleToggle.isOn = true; // Oyuncu
-        OnRoleToggleChanged(true);
+        // Start game button (sadece Master Client için)
+        if (startGameButton != null)
+        {
+            startGameButton.onClick.AddListener(StartGame);
+            startGameButton.gameObject.SetActive(false);
+        }
+
+        // Selected team text
+        if (selectedTeamText != null)
+        {
+            selectedTeamText.text = "";
+        }
 
         // Player listesini güncelle
         RefreshPlayerList();
-    }
-
-    private void OnNameChanged(string newName)
-    {
-        currentPlayerName = newName.Trim();
-        UpdateReadyButtonState();
-    }
-
-    private void OnRoleToggleChanged(bool isPlayer)
-    {
-        currentRole = isPlayer ? PlayerInfo.ROLE_PLAYER : PlayerInfo.ROLE_SPECTATOR;
-        roleToggleLabel.text = isPlayer ? "Oyuncu" : "İzleyici";
-
-        // İzleyici seçiliyse takım seçimi gerekli
-        UpdateReadyButtonState();
+        UpdateStartButton();
     }
 
     /// <summary>
-    /// Takım seçimi yapar.
+    /// Takım seçimi yapar (GameScene'e gitmez, sadece kaydeder).
     /// </summary>
-    private void SelectTeam(int teamID)
+    private void SelectTeam(int teamID, string role)
     {
-        // Takım dolu mu kontrol et
-        if (currentRole == PlayerInfo.ROLE_PLAYER)
+        // Zaten seçim yaptıysa değiştirmeye izin ver
+        // Takım/rol dolu mu kontrol et
+        if (role == PlayerInfo.ROLE_PLAYER)
         {
             int teamPlayerCount = PlayerInfo.GetTeamPlayerCount(teamID, PlayerInfo.ROLE_PLAYER);
-            if (teamPlayerCount >= maxPlayersPerTeam)
+            // Eğer zaten bu takımdaysak sayıdan düş
+            if (hasSelectedTeam && PlayerInfo.GetTeamID(PhotonNetwork.LocalPlayer) == teamID
+                && PlayerInfo.GetRole(PhotonNetwork.LocalPlayer) == PlayerInfo.ROLE_PLAYER)
             {
-                statusText.text = $"{PlayerInfo.GetTeamName(teamID)} dolu! Lütfen diğer takımı seçin.";
+                // Aynı takım, sorun yok
+            }
+            else if (teamPlayerCount >= maxPlayersPerTeam)
+            {
+                statusText.text = $"{PlayerInfo.GetTeamName(teamID)} oyuncu kapasitesi dolu!";
                 return;
             }
         }
-        else if (currentRole == PlayerInfo.ROLE_SPECTATOR)
+        else if (role == PlayerInfo.ROLE_SPECTATOR)
         {
-            int spectatorCount = PlayerInfo.GetSpectatorCount();
-            if (spectatorCount >= maxSpectators && currentTeamID != teamID)
+            int spectatorCount = PlayerInfo.GetTeamSpectatorCount(teamID);
+            // Eğer zaten bu takımın izleyicisiysek sayıdan düş
+            if (hasSelectedTeam && PlayerInfo.GetTeamID(PhotonNetwork.LocalPlayer) == teamID
+                && PlayerInfo.GetRole(PhotonNetwork.LocalPlayer) == PlayerInfo.ROLE_SPECTATOR)
             {
-                statusText.text = "İzleyici sayısı dolu!";
+                // Aynı takım, sorun yok
+            }
+            else if (spectatorCount >= maxSpectatorsPerTeam)
+            {
+                statusText.text = $"{PlayerInfo.GetTeamName(teamID)} izleyici kapasitesi dolu!";
                 return;
             }
         }
 
-        currentTeamID = teamID;
-        selectedTeamText.text = $"Seçilen: {PlayerInfo.GetTeamName(teamID)}";
-        statusText.text = $"{PlayerInfo.GetTeamName(teamID)} seçildi.";
-
-        UpdateReadyButtonState();
-    }
-
-    /// <summary>
-    /// Hazır butonunun aktiflik durumunu günceller.
-    /// </summary>
-    private void UpdateReadyButtonState()
-    {
-        bool canBeReady = !string.IsNullOrEmpty(currentPlayerName) && currentTeamID != -1;
-        readyButton.interactable = canBeReady;
-    }
-
-    /// <summary>
-    /// Hazır durumunu değiştirir.
-    /// </summary>
-    private void ToggleReady()
-    {
-        isReady = !isReady;
-
-        // Tank color index'i hesapla
+        // Tank color index'i hesapla (oyuncu için)
         int tankColorIndex = -1;
-        if (currentRole == PlayerInfo.ROLE_PLAYER)
+        if (role == PlayerInfo.ROLE_PLAYER)
         {
-            tankColorIndex = PlayerInfo.GetNextAvailableTankColorIndex(currentTeamID);
+            tankColorIndex = PlayerInfo.GetNextAvailableTankColorIndex(teamID);
             if (tankColorIndex == -1)
             {
                 statusText.text = "Takım dolu!";
-                isReady = false;
                 return;
             }
         }
 
-        // Custom properties'i güncelle
+        // Custom properties'i ayarla
         PlayerInfo.SetPlayerProperties(
             PhotonNetwork.LocalPlayer,
-            currentPlayerName,
-            currentTeamID,
-            currentRole,
-            isReady,
+            "", // İsim GameScene'de girilecek
+            teamID,
+            role,
+            true, // Takım seçildi = hazır (lobby için)
             tankColorIndex
         );
 
-        // UI güncelle
-        readyButton.GetComponentInChildren<TMP_Text>().text = isReady ? "Hazır!" : "Hazır Ol";
-        readyButton.interactable = true;
-        statusText.text = isReady ? "Hazırsınız!" : "Hazır değilsiniz.";
+        hasSelectedTeam = true;
 
-        // Ready olduktan sonra değişiklik yapılamaz
-        if (isReady)
+        // UI güncelle
+        string roleText = role == PlayerInfo.ROLE_PLAYER ? "Oyuncu" : "İzleyici";
+        statusText.text = $"{PlayerInfo.GetTeamName(teamID)} - {roleText} seçildi. Diğer oyuncular bekleniyor...";
+
+        if (selectedTeamText != null)
         {
-            playerNameInput.interactable = false;
-            roleToggle.interactable = false;
-            teamAButton.interactable = false;
-            teamBButton.interactable = false;
+            selectedTeamText.text = $"Seçiminiz: {PlayerInfo.GetTeamName(teamID)} - {roleText}";
         }
-        else
-        {
-            playerNameInput.interactable = true;
-            roleToggle.interactable = true;
-            teamAButton.interactable = true;
-            teamBButton.interactable = true;
-        }
+
+        // Butonları pasifleştir (seçim yapıldı)
+        DisableTeamButtons();
 
         RefreshPlayerList();
+        UpdateStartButton();
     }
 
     /// <summary>
-    /// Oyunu başlatır (sadece Master Client).
+    /// Takım butonlarını devre dışı bırakır.
+    /// </summary>
+    private void DisableTeamButtons()
+    {
+        if (teamAPlayerButton != null) teamAPlayerButton.interactable = false;
+        if (teamBPlayerButton != null) teamBPlayerButton.interactable = false;
+        if (teamASpectatorButton != null) teamASpectatorButton.interactable = false;
+        if (teamBSpectatorButton != null) teamBSpectatorButton.interactable = false;
+    }
+
+    /// <summary>
+    /// Takım butonlarını aktif eder.
+    /// </summary>
+    private void EnableTeamButtons()
+    {
+        if (teamAPlayerButton != null) teamAPlayerButton.interactable = true;
+        if (teamBPlayerButton != null) teamBPlayerButton.interactable = true;
+        if (teamASpectatorButton != null) teamASpectatorButton.interactable = true;
+        if (teamBSpectatorButton != null) teamBSpectatorButton.interactable = true;
+    }
+
+    /// <summary>
+    /// Start butonunu günceller.
+    /// </summary>
+    private void UpdateStartButton()
+    {
+        if (startGameButton == null) return;
+
+        // Sadece Master Client görebilir
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            startGameButton.gameObject.SetActive(false);
+            return;
+        }
+
+        // Herkes takım seçti mi?
+        bool allPlayersReady = AreAllPlayersSelectedTeam();
+        startGameButton.gameObject.SetActive(true);
+        startGameButton.interactable = allPlayersReady;
+
+        if (allPlayersReady)
+        {
+            statusText.text = "Tüm oyuncular hazır! Oyunu başlatabilirsiniz.";
+        }
+    }
+
+    /// <summary>
+    /// Tüm oyuncular takım seçti mi kontrol eder.
+    /// </summary>
+    private bool AreAllPlayersSelectedTeam()
+    {
+        foreach (PhotonPlayer player in PhotonNetwork.PlayerList)
+        {
+            // TeamID -1 ise henüz seçim yapmamış
+            if (PlayerInfo.GetTeamID(player) == -1)
+            {
+                return false;
+            }
+        }
+        return PhotonNetwork.PlayerList.Length > 0;
+    }
+
+    /// <summary>
+    /// Oyunu başlatır (Master Client).
     /// </summary>
     private void StartGame()
     {
-        if (!PhotonNetwork.IsMasterClient)
-        {
-            statusText.text = "Sadece oda sahibi oyunu başlatabilir!";
-            return;
-        }
-
-        // Minimum oyuncu kontrolü (opsiyonel)
-        int totalPlayers = PlayerInfo.GetTeamPlayerCount(PlayerInfo.TEAM_A, PlayerInfo.ROLE_PLAYER) +
-                          PlayerInfo.GetTeamPlayerCount(PlayerInfo.TEAM_B, PlayerInfo.ROLE_PLAYER);
-
-        if (totalPlayers < 2) // En az 2 oyuncu (test için)
-        {
-            statusText.text = "Oyunu başlatmak için en az 2 oyuncu gerekli!";
-            return;
-        }
-
-        // Tüm oyuncular hazır mı?
-        if (!PlayerInfo.AreAllPlayersReady())
-        {
-            statusText.text = "Tüm oyuncular hazır değil!";
-            return;
-        }
+        if (!PhotonNetwork.IsMasterClient) return;
+        if (!AreAllPlayersSelectedTeam()) return;
 
         statusText.text = "Oyun başlatılıyor...";
         PhotonNetwork.LoadLevel("GameScene");
@@ -214,28 +225,28 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         // Takım oyuncu sayılarını hesapla
         int teamAPlayerCount = PlayerInfo.GetTeamPlayerCount(PlayerInfo.TEAM_A, PlayerInfo.ROLE_PLAYER);
         int teamBPlayerCount = PlayerInfo.GetTeamPlayerCount(PlayerInfo.TEAM_B, PlayerInfo.ROLE_PLAYER);
-        int spectatorCount = PlayerInfo.GetSpectatorCount();
+        int teamASpectatorCount = PlayerInfo.GetTeamSpectatorCount(PlayerInfo.TEAM_A);
+        int teamBSpectatorCount = PlayerInfo.GetTeamSpectatorCount(PlayerInfo.TEAM_B);
 
-        // Sayaçları güncelle (format: "max/current")
+        // Sayaçları güncelle
         if (teamACountText != null)
         {
-            teamACountText.text = $"{maxPlayersPerTeam}/{teamAPlayerCount}";
+            teamACountText.text = $"{teamAPlayerCount}/{maxPlayersPerTeam}";
         }
 
         if (teamBCountText != null)
         {
-            teamBCountText.text = $"{maxPlayersPerTeam}/{teamBPlayerCount}";
+            teamBCountText.text = $"{teamBPlayerCount}/{maxPlayersPerTeam}";
         }
 
-        if (spectatorCountText != null)
+        if (teamASpectatorCountText != null)
         {
-            spectatorCountText.text = $"{maxSpectators}/{spectatorCount}";
+            teamASpectatorCountText.text = $"{teamASpectatorCount}/{maxSpectatorsPerTeam}";
         }
 
-        // Master Client ise Start butonu göster
-        if (PhotonNetwork.IsMasterClient)
+        if (teamBSpectatorCountText != null)
         {
-            startGameButton.gameObject.SetActive(true);
+            teamBSpectatorCountText.text = $"{teamBSpectatorCount}/{maxSpectatorsPerTeam}";
         }
     }
 
@@ -244,23 +255,33 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     public override void OnPlayerEnteredRoom(PhotonPlayer newPlayer)
     {
         RefreshPlayerList();
-        statusText.text = $"{newPlayer.NickName} odaya katıldı.";
+        UpdateStartButton();
+        if (!hasSelectedTeam)
+        {
+            statusText.text = $"{newPlayer.NickName} odaya katıldı.";
+        }
     }
 
     public override void OnPlayerLeftRoom(PhotonPlayer otherPlayer)
     {
         RefreshPlayerList();
-        statusText.text = $"{otherPlayer.NickName} odadan ayrıldı.";
+        UpdateStartButton();
+        if (!hasSelectedTeam)
+        {
+            statusText.text = $"{otherPlayer.NickName} odadan ayrıldı.";
+        }
     }
 
     public override void OnPlayerPropertiesUpdate(PhotonPlayer targetPlayer, Hashtable changedProps)
     {
         RefreshPlayerList();
+        UpdateStartButton();
     }
 
     public override void OnMasterClientSwitched(PhotonPlayer newMasterClient)
     {
         RefreshPlayerList();
+        UpdateStartButton();
 
         if (PhotonNetwork.IsMasterClient)
         {

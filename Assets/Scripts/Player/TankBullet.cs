@@ -3,7 +3,7 @@ using Photon.Pun;
 using TankGame;
 using TankGame.Score;
 
-namespace TankGame.Player
+namespace TankGame.Tank
 {
     /// <summary>
     /// Mermi davranışı - +X yönünde hareket eder

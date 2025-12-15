@@ -1,13 +1,16 @@
 using UnityEngine;
 using TMPro;
+using Photon.Pun;
+using ExitGames.Client.Photon;
 
 namespace TankGame.Score
 {
     /// <summary>
     /// 2D World Space'te skor gösterimi
     /// TextMeshPro kullanır
+    /// Takım ismini de gösterir
     /// </summary>
-    public class ScoreDisplay : MonoBehaviour
+    public class ScoreDisplay : MonoBehaviourPunCallbacks
     {
         [Header("Team Settings")]
         [Tooltip("Bu display hangi takıma ait? 0 = Team A, 1 = Team B")]
@@ -17,16 +20,21 @@ namespace TankGame.Score
         [Tooltip("Skor text componenti")]
         [SerializeField] private TextMeshPro scoreText;
 
+        [Header("Team Name Display")]
+        [Tooltip("Takım ismi text componenti (opsiyonel)")]
+        [SerializeField] private TextMeshPro teamNameText;
+
         [Header("Format")]
-        [Tooltip("Skor format stringi. {0} = skor değeri")]
-        [SerializeField] private string scoreFormat = "SKOR: {0}";
+        [Tooltip("Skor format stringi. {0} = takım ismi, {1} = skor değeri")]
+        [SerializeField] private string scoreFormat = "{0}: {1}";
 
         private void Start()
         {
             // Event'e subscribe ol
             ScoreManager.OnScoreChanged += OnScoreChanged;
 
-            // Başlangıç skorunu göster
+            // Başlangıç değerlerini göster
+            UpdateTeamName();
             UpdateDisplay(0);
         }
 
@@ -46,7 +54,17 @@ namespace TankGame.Score
         {
             if (scoreText != null)
             {
-                scoreText.text = string.Format(scoreFormat, score);
+                string teamName = PlayerInfo.GetCustomTeamName(teamId);
+                scoreText.text = string.Format(scoreFormat, teamName, score);
+            }
+        }
+
+        private void UpdateTeamName()
+        {
+            if (teamNameText != null)
+            {
+                string teamName = PlayerInfo.GetCustomTeamName(teamId);
+                teamNameText.text = teamName;
             }
         }
 
@@ -65,5 +83,25 @@ namespace TankGame.Score
         {
             teamId = id;
         }
+
+        #region Photon Callbacks
+
+        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+        {
+            // Takım ismi değiştiğinde güncelle
+            if (propertiesThatChanged.ContainsKey(PlayerInfo.TEAM_A_NAME) ||
+                propertiesThatChanged.ContainsKey(PlayerInfo.TEAM_B_NAME))
+            {
+                UpdateTeamName();
+                // Skoru da güncelle (takım ismi değiştiği için)
+                if (ScoreManager.Instance != null)
+                {
+                    int score = ScoreManager.Instance.GetTeamScore(teamId);
+                    UpdateDisplay(score);
+                }
+            }
+        }
+
+        #endregion
     }
 }

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace TankGame.Player
+namespace TankGame.Tank
 {
     /// <summary>
     /// Kamerayı tankı takip ettirir

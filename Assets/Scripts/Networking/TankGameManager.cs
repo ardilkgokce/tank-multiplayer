@@ -2,7 +2,7 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 using PhotonPlayer = Photon.Realtime.Player;
-using TankGame.Player;
+using TankGame.Tank;
 
 namespace TankGame.Networking
 {
@@ -226,6 +226,7 @@ namespace TankGame.Networking
         public override void OnLeftRoom()
         {
             Debug.Log("Odadan ayrıldık. Menu sahnesine dönülüyor");
+            // NOT: F5 ile sahne yenilemede bu çağrılmaz, sadece gerçek disconnect'te
             PhotonNetwork.LoadLevel("MenuScene");
         }
 

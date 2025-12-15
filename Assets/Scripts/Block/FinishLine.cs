@@ -2,13 +2,15 @@ using UnityEngine;
 using Photon.Pun;
 using System;
 using System.Collections.Generic;
-using TankGame.Player;
+using TankGame.Tank;
+using TankGame.Game;
 
 namespace TankGame.Block
 {
     /// <summary>
     /// Finish Line - Sola hareket eder
     /// Takımdaki tüm tanklara değince (geçince) takım finish olur
+    /// Oyun başlayana kadar hareket etmez
     /// </summary>
     public class FinishLine : MonoBehaviourPun
     {
@@ -30,6 +32,7 @@ namespace TankGame.Block
         private HashSet<int> passedTanks = new HashSet<int>(); // Geçen tankların PhotonView ID'leri
         private bool hasFinished = false;
         private bool isDestroyed = false;
+        private bool canMove = false;
 
         private void Start()
         {
@@ -47,10 +50,32 @@ namespace TankGame.Block
             {
                 Debug.LogWarning($"FinishLine: InstantiationData null veya eksik! Varsayılan değerler kullanılıyor. Data: {photonView.InstantiationData?.Length ?? 0}");
             }
+
+            // Oyun başlama event'ine subscribe ol
+            GameController.OnGameStarted += OnGameStarted;
+
+            // Oyun zaten başlamışsa hareket aktif
+            if (GameController.Instance != null && GameController.Instance.IsGameStarted())
+            {
+                canMove = true;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            GameController.OnGameStarted -= OnGameStarted;
+        }
+
+        private void OnGameStarted()
+        {
+            canMove = true;
         }
 
         private void Update()
         {
+            // Oyun başlamadıysa hareket etme
+            if (!canMove) return;
+
             // Sola doğru hareket et
             transform.Translate(Vector3.left * moveSpeed * Time.deltaTime);
 

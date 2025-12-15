@@ -22,6 +22,9 @@ namespace TankGame.Networking
 
         private void Awake()
         {
+            // Uygulama arka planda da çalışsın - Photon bağlantısı kopmaz
+            Application.runInBackground = true;
+
             // Sahne senkronizasyonunu aktif et - master client sahne yüklediğinde tüm clientlar da yükler
             PhotonNetwork.AutomaticallySyncScene = true;
         }

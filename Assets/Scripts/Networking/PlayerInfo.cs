@@ -27,6 +27,11 @@ public class PlayerInfo
     public const int TEAM_A = 0;
     public const int TEAM_B = 1;
 
+    // Room Property Key'leri (Takım isimleri)
+    public const string TEAM_A_NAME = "TeamAName";
+    public const string TEAM_B_NAME = "TeamBName";
+    public const string GAME_STARTED = "GameStarted";
+
     // Tank renk isimleri (sırayla)
     public static readonly string[] TankColorNames = new string[]
     {
@@ -160,6 +165,103 @@ public class PlayerInfo
             }
         }
         return count;
+    }
+
+    /// <summary>
+    /// Belirtilen takımdaki izleyici sayısını döndürür.
+    /// </summary>
+    public static int GetTeamSpectatorCount(int teamID)
+    {
+        int count = 0;
+        foreach (PhotonPlayer player in PhotonNetwork.PlayerList)
+        {
+            if (GetTeamID(player) == teamID && GetRole(player) == ROLE_SPECTATOR)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Takım ismini Room Property'den alır.
+    /// </summary>
+    public static string GetCustomTeamName(int teamID)
+    {
+        if (PhotonNetwork.CurrentRoom == null) return GetTeamName(teamID);
+
+        string key = teamID == TEAM_A ? TEAM_A_NAME : TEAM_B_NAME;
+        object teamName;
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(key, out teamName))
+        {
+            string name = (string)teamName;
+            if (!string.IsNullOrEmpty(name))
+            {
+                return name;
+            }
+        }
+        return GetTeamName(teamID); // Default isim
+    }
+
+    /// <summary>
+    /// Takım ismini Room Property'ye kaydeder.
+    /// </summary>
+    public static void SetCustomTeamName(int teamID, string teamName)
+    {
+        if (PhotonNetwork.CurrentRoom == null) return;
+
+        string key = teamID == TEAM_A ? TEAM_A_NAME : TEAM_B_NAME;
+        Hashtable props = new Hashtable { { key, teamName } };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// Oyunun başlayıp başlamadığını kontrol eder.
+    /// </summary>
+    public static bool IsGameStarted()
+    {
+        if (PhotonNetwork.CurrentRoom == null) return false;
+
+        object started;
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(GAME_STARTED, out started))
+        {
+            return (bool)started;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Oyun başlama durumunu ayarlar.
+    /// </summary>
+    public static void SetGameStarted(bool started)
+    {
+        if (PhotonNetwork.CurrentRoom == null) return;
+
+        Hashtable props = new Hashtable { { GAME_STARTED, started } };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// Sadece oyuncuların (spectator değil) hazır olup olmadığını kontrol eder.
+    /// </summary>
+    public static bool AreAllPlayersReadyExcludingSpectators()
+    {
+        int playerCount = 0;
+        int readyCount = 0;
+
+        foreach (PhotonPlayer player in PhotonNetwork.PlayerList)
+        {
+            if (GetRole(player) == ROLE_PLAYER)
+            {
+                playerCount++;
+                if (GetIsReady(player))
+                {
+                    readyCount++;
+                }
+            }
+        }
+
+        return playerCount > 0 && playerCount == readyCount;
     }
 
     /// <summary>
