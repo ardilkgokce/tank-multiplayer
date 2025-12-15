@@ -2,6 +2,7 @@ using UnityEngine;
 using Photon.Pun;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using ExitGames.Client.Photon;
 using Photon.Realtime;
 using TankGame.Block;
@@ -45,6 +46,9 @@ namespace TankGame.Game
         private bool isWaiting = false;
         private HashSet<int> finishedTeams = new HashSet<int>();
 
+        // Oyun başlangıç zamanı (kayıt için)
+        private DateTime gameStartTime;
+
         private void Awake()
         {
             if (Instance == null)
@@ -62,6 +66,9 @@ namespace TankGame.Game
         {
             // FinishLine eventine subscribe ol
             FinishLine.OnTeamFinished += OnTeamFinished;
+
+            // Oyun başlangıç zamanını kaydet
+            gameStartTime = DateTime.Now;
 
             // Oyun durumunu başlat
             if (PhotonNetwork.IsMasterClient)
@@ -180,6 +187,9 @@ namespace TankGame.Game
             PhotonNetwork.CurrentRoom.SetCustomProperties(props);
 
             Debug.Log($"OYUN BİTTİ! Kazanan: Takım {winnerTeam} | Takım A: {teamAScore} - Takım B: {teamBScore}");
+
+            // Oyun sonucunu dosyaya kaydet (sadece Master Client)
+            SaveGameResult(winnerTeam, teamAScore, teamBScore);
         }
 
         /// <summary>
@@ -226,6 +236,65 @@ namespace TankGame.Game
             }
             return -1;
         }
+
+        #region Game Result Saving
+
+        /// <summary>
+        /// Oyun sonucunu CSV dosyasına kaydeder (sadece Master Client)
+        /// </summary>
+        private void SaveGameResult(int winnerTeam, int teamAScore, int teamBScore)
+        {
+            try
+            {
+                // Kayıt klasörünü oluştur
+                string recordsFolder = Path.Combine(Application.dataPath, "..", "kayitlar");
+                if (!Directory.Exists(recordsFolder))
+                {
+                    Directory.CreateDirectory(recordsFolder);
+                    Debug.Log($"Kayıt klasörü oluşturuldu: {recordsFolder}");
+                }
+
+                // CSV dosya yolu
+                string csvFilePath = Path.Combine(recordsFolder, "oyun_sonuclari.csv");
+                bool fileExists = File.Exists(csvFilePath);
+
+                // Takım isimlerini al
+                string teamAName = PlayerInfo.GetCustomTeamName(0);
+                string teamBName = PlayerInfo.GetCustomTeamName(1);
+
+                // Kazanan takım adı
+                string winnerName = winnerTeam == 0 ? teamAName : (winnerTeam == 1 ? teamBName : "Berabere");
+
+                // Oyun süresi
+                DateTime gameEndTime = DateTime.Now;
+                TimeSpan gameDuration = gameEndTime - gameStartTime;
+                string durationStr = $"{(int)gameDuration.TotalMinutes}:{gameDuration.Seconds:D2}";
+
+                // CSV satırını oluştur
+                using (StreamWriter writer = new StreamWriter(csvFilePath, true, System.Text.Encoding.UTF8))
+                {
+                    // Başlık satırını yaz (dosya yeni oluşturulduysa)
+                    if (!fileExists)
+                    {
+                        writer.WriteLine("Tarih;Saat;Takim A;Takim A Puan;Takim B;Takim B Puan;Kazanan;Oyun Suresi");
+                    }
+
+                    // Veri satırını yaz
+                    string dateStr = gameEndTime.ToString("dd.MM.yyyy");
+                    string timeStr = gameEndTime.ToString("HH:mm:ss");
+                    string line = $"{dateStr};{timeStr};{teamAName};{teamAScore};{teamBName};{teamBScore};{winnerName};{durationStr}";
+                    writer.WriteLine(line);
+                }
+
+                Debug.Log($"Oyun sonucu kaydedildi: {csvFilePath}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Oyun sonucu kaydedilemedi: {ex.Message}");
+            }
+        }
+
+        #endregion
 
         #region Photon Callbacks
 
