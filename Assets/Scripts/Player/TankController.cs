@@ -46,9 +46,13 @@ namespace TankGame.Tank
         // Movement input
         private Vector2 moveInput;
 
-        // Network sync
+        // Network sync - improved interpolation
         private Vector3 networkPosition;
-        private float lerpSpeed = 10f;
+        private Vector2 networkVelocity;
+        private Vector3 smoothVelocity = Vector3.zero;
+        private float smoothTime = 0.08f; // SmoothDamp için süre (düşük = daha hızlı takip)
+        private float teleportThreshold = 3f; // Bu mesafeden fazlaysa teleport
+        private float velocityPredictionFactor = 0.5f; // Velocity tahmin çarpanı
 
         // Shooting
         private float nextFireTime = 0f;
@@ -162,7 +166,7 @@ namespace TankGame.Tank
             if (!pv.IsMine)
             {
                 // Diğer oyuncuların tanklarını smooth şekilde senkronize et
-                transform.position = Vector3.Lerp(transform.position, networkPosition, Time.deltaTime * lerpSpeed);
+                SyncRemotePlayer();
                 return;
             }
 
@@ -192,6 +196,33 @@ namespace TankGame.Tank
 
             // Hareketi uygula
             ApplyMovement();
+        }
+
+        /// <summary>
+        /// Uzak oyuncuların pozisyonlarını smooth şekilde senkronize eder
+        /// SmoothDamp + Velocity prediction kullanır
+        /// </summary>
+        private void SyncRemotePlayer()
+        {
+            // Hedef pozisyonu velocity ile tahmin et (daha akıcı hareket için)
+            Vector3 predictedPosition = networkPosition + (Vector3)(networkVelocity * velocityPredictionFactor * Time.deltaTime);
+
+            // Çok uzaktaysa teleport et (lag spike durumları)
+            float distance = Vector3.Distance(transform.position, predictedPosition);
+            if (distance > teleportThreshold)
+            {
+                transform.position = predictedPosition;
+                smoothVelocity = Vector3.zero;
+                return;
+            }
+
+            // SmoothDamp ile yumuşak geçiş (Lerp'den daha iyi sonuç verir)
+            transform.position = Vector3.SmoothDamp(
+                transform.position,
+                predictedPosition,
+                ref smoothVelocity,
+                smoothTime
+            );
         }
 
         /// <summary>
@@ -288,7 +319,7 @@ namespace TankGame.Tank
             {
                 // Diğer oyuncunun verilerini al
                 networkPosition = (Vector3)stream.ReceiveNext();
-                Vector2 networkVelocity = (Vector2)stream.ReceiveNext();
+                networkVelocity = (Vector2)stream.ReceiveNext();
 
                 // Lag compensation için pozisyon tahmini
                 float lag = Mathf.Abs((float)(PhotonNetwork.Time - info.SentServerTime));
