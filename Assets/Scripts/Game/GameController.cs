@@ -3,8 +3,11 @@ using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 using System;
+using System.Collections;
 using TankGame.Block;
 using TankGame.Score;
+using TMPro;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 namespace TankGame.Game
 {
@@ -32,10 +35,16 @@ namespace TankGame.Game
 
         [Header("Status UI")]
         [SerializeField] private GameObject masterClientHintPanel;
-        [SerializeField] private TMPro.TMP_Text masterClientHintText;
+        [SerializeField] private TMP_Text masterClientHintText;
+
+        [Header("Countdown")]
+        [SerializeField] private TMP_Text countdownText;
+        [SerializeField] private int countdownSeconds = 10;
+        [SerializeField] private string countdownStartMessage = "BAŞLA!";
 
         private bool isGamePaused = true;
         private bool isGameStarted = false;
+        private bool isCountdownActive = false;
 
         private void Awake()
         {
@@ -71,6 +80,12 @@ namespace TankGame.Game
             {
                 blockSpawner.StopSpawning();
             }
+
+            // Countdown text'i gizle
+            if (countdownText != null)
+            {
+                countdownText.gameObject.SetActive(false);
+            }
         }
 
         private void Update()
@@ -78,10 +93,10 @@ namespace TankGame.Game
             // Sadece Master Client kontrol edebilir
             if (!PhotonNetwork.IsMasterClient) return;
 
-            // F1: Oyunu başlat
-            if (Input.GetKeyDown(KeyCode.F1) && !isGameStarted)
+            // F1: Oyunu başlat (countdown ile)
+            if (Input.GetKeyDown(KeyCode.F1) && !isGameStarted && !isCountdownActive)
             {
-                StartGame();
+                StartCountdown();
             }
 
             // F5: Sahneyi yenile
@@ -92,12 +107,12 @@ namespace TankGame.Game
         }
 
         /// <summary>
-        /// Oyunu başlatır (Master Client)
+        /// Countdown'u başlatır (Master Client)
         /// </summary>
-        private void StartGame()
+        private void StartCountdown()
         {
             if (!PhotonNetwork.IsMasterClient) return;
-            if (isGameStarted) return;
+            if (isGameStarted || isCountdownActive) return;
 
             // Her iki takım da hazır mı kontrol et
             if (!PlayerInfo.AreBothTeamsReady())
@@ -110,6 +125,95 @@ namespace TankGame.Game
                 return;
             }
 
+            Debug.Log("Countdown başlatılıyor...");
+            isCountdownActive = true;
+
+            // RPC ile tüm client'larda countdown başlat
+            photonView.RPC(nameof(RPC_StartCountdown), RpcTarget.All, countdownSeconds);
+        }
+
+        [PunRPC]
+        private void RPC_StartCountdown(int seconds)
+        {
+            isCountdownActive = true;
+
+            // Ready panelini gizle
+            if (readyPanel != null)
+            {
+                readyPanel.HidePanel();
+            }
+            else
+            {
+                var panel = GameReadyPanel.Instance;
+                if (panel != null)
+                {
+                    panel.HidePanel();
+                }
+            }
+
+            // Master hint'i gizle
+            if (masterClientHintPanel != null)
+            {
+                masterClientHintPanel.SetActive(false);
+            }
+
+            // Countdown coroutine başlat
+            StartCoroutine(CountdownCoroutine(seconds));
+        }
+
+        /// <summary>
+        /// Countdown coroutine - tüm clientlarda çalışır
+        /// </summary>
+        private IEnumerator CountdownCoroutine(int seconds)
+        {
+            // Countdown text'i aktif et
+            if (countdownText != null)
+            {
+                countdownText.gameObject.SetActive(true);
+            }
+
+            // Geri sayım
+            for (int i = seconds; i > 0; i--)
+            {
+                if (countdownText != null)
+                {
+                    countdownText.text = i.ToString();
+                }
+                yield return new WaitForSeconds(1f);
+            }
+
+            // BAŞLA! göster
+            if (countdownText != null)
+            {
+                countdownText.text = countdownStartMessage;
+            }
+
+            // Kısa bir süre BAŞLA! yazısını göster
+            yield return new WaitForSeconds(1f);
+
+            // Countdown text'i gizle
+            if (countdownText != null)
+            {
+                countdownText.gameObject.SetActive(false);
+            }
+
+            isCountdownActive = false;
+
+            // Sadece Master Client oyunu başlatır
+            if (PhotonNetwork.IsMasterClient)
+            {
+                StartGame();
+            }
+        }
+
+        /// <summary>
+        /// Oyunu başlatır (Master Client - countdown sonrası)
+        /// </summary>
+        private void StartGame()
+        {
+            if (!PhotonNetwork.IsMasterClient) return;
+            if (isGameStarted) return;
+
             Debug.Log("Oyun başlatılıyor...");
 
             // Room property'leri güncelle
@@ -120,7 +224,7 @@ namespace TankGame.Game
             isGamePaused = false;
 
             // RPC ile tüm client'lara bildir
-            photonView.RPC("RPC_StartGame", RpcTarget.All);
+            photonView.RPC(nameof(RPC_StartGame), RpcTarget.All);
         }
 
         [PunRPC]
@@ -130,21 +234,6 @@ namespace TankGame.Game
             isGamePaused = false;
 
             Debug.Log("Oyun başladı!");
-
-            // Ready panelini gizle
-            if (readyPanel != null)
-            {
-                readyPanel.HidePanel();
-            }
-            else
-            {
-                // Instance üzerinden bul
-                var panel = GameReadyPanel.Instance;
-                if (panel != null)
-                {
-                    panel.HidePanel();
-                }
-            }
 
             // Block spawner'ı başlat
             if (blockSpawner != null)
@@ -159,12 +248,6 @@ namespace TankGame.Game
                 {
                     spawner.StartSpawning();
                 }
-            }
-
-            // Master hint'i gizle
-            if (masterClientHintPanel != null)
-            {
-                masterClientHintPanel.SetActive(false);
             }
 
             // Event tetikle
