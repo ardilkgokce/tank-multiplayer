@@ -27,6 +27,10 @@ namespace TankGame.Game
         [SerializeField] private Button readyButton;
         [SerializeField] private TMP_Text readyButtonText;
 
+        [Header("Input Settings")]
+        [Tooltip("Takım ismi için maksimum karakter sayısı")]
+        [SerializeField] private int maxTeamNameLength = 17;
+
         [Header("Status")]
         [SerializeField] private TMP_Text statusText;
         [SerializeField] private TMP_Text readyCountText;
@@ -96,6 +100,9 @@ namespace TankGame.Game
             // Button listener
             readyButton.onClick.AddListener(OnReadyClicked);
             nameInput.onValueChanged.AddListener(OnNameChanged);
+
+            // Karakter limiti ayarla
+            nameInput.characterLimit = maxTeamNameLength;
 
             // Başlangıçta ready butonu pasif
             readyButton.interactable = false;

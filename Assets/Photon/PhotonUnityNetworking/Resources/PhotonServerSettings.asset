@@ -41,6 +41,7 @@ MonoBehaviour:
   - Fire
   - RespawnSpaceship
   - RPC_DamageFlash
+  - RPC_ReceiveLeaderboard
   - RPC_ReloadScene
   - RPC_ShowFloatingText
   - RPC_StartGame
