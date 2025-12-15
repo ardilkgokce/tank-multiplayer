@@ -5,7 +5,8 @@
       "Bash(dir /B \"C:\\Users\\ardil\\Unity Projects\\tank-multiplayer\\Assets\")",
       "Bash(dir:*)",
       "Bash(powershell -Command:*)",
-      "Bash(del \"C:\\Users\\ardil\\unity-projects\\tank-multiplayer\\Assets\\Scripts\\Block\\GoalTrigger.cs\")"
+      "Bash(del \"C:\\Users\\ardil\\unity-projects\\tank-multiplayer\\Assets\\Scripts\\Block\\GoalTrigger.cs\")",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

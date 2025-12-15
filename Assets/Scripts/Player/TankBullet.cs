@@ -2,6 +2,7 @@ using UnityEngine;
 using Photon.Pun;
 using TankGame;
 using TankGame.Score;
+using TankGame.UI;
 
 namespace TankGame.Tank
 {
@@ -83,14 +84,25 @@ namespace TankGame.Tank
                 // Test modunda veya renk eşleşiyorsa box'ı yok et
                 if (TestMode || box.GetColor() == bulletColor)
                 {
+                    // Box pozisyonunu kaydet (destroy'dan önce)
+                    Vector3 boxPosition = box.transform.position;
+
                     // Box ve bullet yok olsun
                     box.RequestDestroy();
 
                     // Skor ekle (bullet sahibinin takımına)
                     int teamId = PlayerInfo.GetTeamID(photonView.Owner);
+                    int points = 0;
                     if (ScoreManager.Instance != null)
                     {
+                        points = ScoreManager.Instance.GetPointsPerBox();
                         ScoreManager.Instance.AddScore(teamId);
+                    }
+
+                    // Floating text göster (pozitif puan) - tüm clientlarda
+                    if (FloatingTextManager.Instance != null)
+                    {
+                        FloatingTextManager.Instance.ShowFloatingText(points, boxPosition);
                     }
 
                     isDestroyed = true;

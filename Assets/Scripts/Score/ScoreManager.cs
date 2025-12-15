@@ -83,6 +83,25 @@ namespace TankGame.Score
         }
 
         /// <summary>
+        /// Belirtilen takımdan puan düşer (box tanka çarptığında)
+        /// </summary>
+        public void SubtractScore(int teamId, int points = -1)
+        {
+            if (points < 0) points = pointsPerBox;
+
+            // Mevcut skoru al ve yeni skoru hesapla
+            int currentScore = GetTeamScore(teamId);
+            int newScore = currentScore - points;
+
+            // Room property'yi güncelle
+            string key = teamId == 0 ? SCORE_TEAM_A : SCORE_TEAM_B;
+            Hashtable props = new Hashtable { { key, newScore } };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+
+            Debug.Log($"Skor düşürüldü! Takım {teamId}: {currentScore} -> {newScore} (-{points})");
+        }
+
+        /// <summary>
         /// Belirtilen takımın skorunu döndürür
         /// </summary>
         public int GetTeamScore(int teamId)
