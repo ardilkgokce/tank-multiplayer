@@ -191,7 +191,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 5
   firePoint: {fileID: 2432645628826429159}
-  fireRate: 0.5
+  fireRate: 1
   bulletPrefabName: Bullet
   tankColor: 3
   spriteRenderer: {fileID: 216718495533135754}

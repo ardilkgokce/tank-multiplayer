@@ -124,7 +124,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speed: 15
   lifetime: 3
-  stickDestroyDelay: 1
+  stickDestroyDelay: 0.5
 --- !u!50 &9186854518832377285
 Rigidbody2D:
   serializedVersion: 4
