@@ -21,17 +21,17 @@ A 2D multiplayer tank game built with Unity and Photon Unity Networking (PUN). F
 ```
 Assets/
 ├── Scripts/
-│   ├── Box.cs                    # Destructible box behavior
+│   ├── Box.cs                    # Destructible box behavior + tank collision penalty
 │   ├── TankColor.cs              # Color enum (Green, Grey, Orange, Purple, Yellow)
 │   ├── Block/
 │   │   ├── BlockSpawner.cs       # Spawns blocks and finish line
 │   │   ├── BlockMover.cs         # Moves blocks left
 │   │   └── FinishLine.cs         # Finish line detection
 │   ├── Game/
-│   │   ├── GameController.cs     # Game flow control (F1 start, F5 reload)
-│   │   ├── GameSessionManager.cs # Game state, win/lose logic
-│   │   ├── GameReadyPanel.cs     # Team name input and ready UI
-│   │   └── GameEndUI.cs          # End game UI (win/lose screen)
+│   │   ├── GameController.cs     # Game flow control (F1 countdown start, F5 reload)
+│   │   ├── GameSessionManager.cs # Game state, win/lose logic, CSV kayıt
+│   │   ├── GameReadyPanel.cs     # Team name input (max 17 chars) and ready UI
+│   │   └── GameEndUI.cs          # End game UI + Leaderboard (RPC synced)
 │   ├── Input/
 │   │   └── MobileInputManager.cs # Mobile joystick and fire button
 │   ├── Networking/
@@ -41,38 +41,43 @@ Assets/
 │   │   ├── TankGameManager.cs    # Player spawning based on team/role
 │   │   └── TeamManager.cs        # Layer assignment, camera culling
 │   ├── Player/
-│   │   ├── TankController.cs     # Tank movement, shooting, joystick support
-│   │   ├── TankBullet.cs         # Bullet behavior, color-based destruction
+│   │   ├── TankController.cs     # Tank movement, shooting, damage flash, network interpolation
+│   │   ├── TankBullet.cs         # Bullet behavior, stick mechanic, continuous collision
 │   │   ├── CameraFollow.cs       # Smooth camera following
 │   │   └── SpectatorController.cs # Spectator camera
-│   └── Score/
-│       ├── ScoreManager.cs       # Team score management (Photon synced)
-│       └── ScoreDisplay.cs       # 2D World Space score display with team names
+│   ├── Score/
+│   │   ├── ScoreManager.cs       # Team score management (AddScore, SubtractScore)
+│   │   └── ScoreDisplay.cs       # 2D World Space score display with team names
+│   └── UI/
+│       ├── FloatingText.cs       # Object pooled floating +/- points display
+│       └── FloatingTextManager.cs # RPC synced floating text spawner
 ├── Prefabs/
 │   ├── Resources/                # Network-instantiated prefabs
 │   │   ├── Tank_Green/Grey/Orange/Purple/Yellow.prefab
 │   │   ├── Bullet.prefab
 │   │   ├── SpectatorCamera.prefab
-│   │   ├── FinishLine.prefab     # Finish line prefab
-│   │   └── Block_*.prefab        # Block prefabs
+│   │   ├── FinishLine.prefab
+│   │   ├── Block_*.prefab
+│   │   └── FloatingText.prefab   # Floating score text
 │   ├── Box_Green/Grey/Orange/Purple/Yellow.prefab
-│   └── Blocks/                   # Level design block variants
+│   └── Blocks/
 │       └── BoxGreen_1 through BoxGreen_8.prefab
 ├── Scenes/
 │   ├── MenuScene.unity           # Connection and lobby
 │   └── GameScene.unity           # Gameplay arena
-└── Imports/Sprites/              # Tank and block sprites
+└── kayitlar/                     # Game results CSV folder (auto-created)
+    └── oyun_sonuclari.csv        # Game history for leaderboard
 ```
 
 ## Game Architecture
 
 ### Scene Flow
 ```
-MenuScene → LobbyPanel (Team Selection) → GameScene → GameReadyPanel → F1 Start → Gameplay
+MenuScene → LobbyPanel (Team Selection) → GameScene → GameReadyPanel → F1 Countdown (10s) → Gameplay
 ```
 
 1. **MenuScene**: Connect to Photon, auto-join/create room, team selection (4 buttons)
-2. **GameScene**: Tank spawning, ready panel for team names, F1 to start game
+2. **GameScene**: Tank spawning, ready panel for team names, F1 starts 10-second countdown
 
 ### Game Flow
 ```
@@ -80,25 +85,29 @@ GameScene loads
     ↓
 TankGameManager spawns tanks/spectators
     ↓
-GameReadyPanel shows (players enter team names)
+GameReadyPanel shows (players enter team names, max 17 chars)
     ↓
-Master Client presses F1 (GameController.StartGame)
+Master Client presses F1
+    ↓
+10-second countdown (synced via RPC)
+    ↓
+"BAŞLA!" shown, game starts
     ↓
 BlockSpawner.StartSpawning() begins
     ↓
 Blocks spawn and move left towards tanks
     ↓
-Players shoot matching-color boxes to destroy them
+Players shoot matching-color boxes (+10 points, bullet sticks 1s before destroy)
     ↓
-Score increases per destroyed box (+10 points)
+Tank hits box = -10 points, red flash, box destroyed
     ↓
 FinishLine spawns after all blocks
     ↓
 FinishLine passes through all tanks = Team Finished
     ↓
-GameSessionManager determines winner (higher score wins)
+GameSessionManager determines winner, saves to CSV
     ↓
-GameEndUI shows result (KAZANDINIZ/KAYBETTİNİZ) with team names
+GameEndUI shows result (5s), then Leaderboard (top 10 from CSV)
     ↓
 Master Client presses F5 to reload (new game)
 ```
@@ -111,6 +120,7 @@ Master Client presses F5 to reload (new game)
 - `TankGame.Tank` - TankController, TankBullet, CameraFollow, SpectatorController
 - `TankGame.Score` - ScoreManager, ScoreDisplay
 - `TankGame.MobileInput` - MobileInputManager
+- `TankGame.UI` - FloatingText, FloatingTextManager
 - Root namespace - PlayerInfo, LobbyManager, TeamManager
 
 ## Game Controls
@@ -118,7 +128,7 @@ Master Client presses F5 to reload (new game)
 ### Keyboard Controls
 | Key | Function | Who |
 |-----|----------|-----|
-| F1 | Start Game | Master Client only |
+| F1 | Start Countdown (10s) | Master Client only |
 | F5 | Reload Scene | Master Client only |
 | WASD/Arrows | Tank movement | Players |
 | Space | Shoot | Players |
@@ -132,37 +142,61 @@ Master Client presses F5 to reload (new game)
 ### Movement
 - **Controls:** WASD, Arrow keys, or Mobile Joystick
 - **Physics:** Rigidbody2D velocity-based movement
-- **Network sync:** Position and velocity via `OnPhotonSerializeView` with lag compensation
+- **Network sync:** SmoothDamp + Velocity prediction for smooth remote player movement
+
+### Network Interpolation (TankController)
+- `smoothTime = 0.08f` - SmoothDamp time
+- `teleportThreshold = 3f` - Teleport if too far
+- `velocityPredictionFactor = 0.5f` - Predict movement with velocity
+- Lag compensation in OnPhotonSerializeView
 
 ### Shooting
 - **Control:** Space bar or Mobile Fire Button
 - **Fire rate:** 0.5 seconds between shots
-- **Bullet behavior:** Travels +X direction, 3-second lifetime
-- **Bullet spawn:** From FirePoint child transform
-- **Test Mode:** When enabled, bullets destroy ALL color boxes (for testing)
+- **Bullet behavior:**
+  - Travels +X direction, 3-second lifetime
+  - **Stick mechanic:** Bullet sticks to matching box for 1s, then both destroy
+  - Continuous collision detection for fast bullets
+- **Test Mode:** When enabled, bullets destroy ALL color boxes
 
 ### Color-Based Destruction
 - Tanks and boxes have colors: Green, Grey, Orange, Purple, Yellow
-- **Matching colors:** Both bullet AND box are destroyed, +10 score
+- **Matching colors:** Bullet sticks to box (1s), then both destroyed, +10 score
 - **Non-matching colors:** Only bullet is destroyed
-- **Tank hits:** Bullet destroyed (no friendly fire damage yet)
+- **Tank collision with box:** Box destroyed, -10 score, tank red flash
 
-### Block System
-- **BlockSpawner:** Waits for GameController.StartSpawning(), spawns blocks at intervals
-- **BlockMover:** Moves blocks left at configurable speed
-- **FinishLine:** Spawns after all blocks, waits for GameController.OnGameStarted to move
-- **InstantiationData:** Speed and settings synced via PhotonNetwork.Instantiate data
+### Visual Feedback
+- **FloatingText:** +10 green (up), -10 red (down) - object pooled, RPC synced
+- **Damage Flash:** Tank flashes red for 1 second when losing points
 
-### Team Name System
-- **GameReadyPanel:** Players enter custom team name before game starts
-- **One player ready = entire team ready** (first player sets team name)
-- **Spectators:** Auto-marked as ready
-- **Team names displayed:** In ScoreDisplay and GameEndUI
+### Countdown System
+- F1 triggers 10-second countdown (configurable)
+- All clients see countdown via RPC
+- "BAŞLA!" shown for 1 second before game starts
+- Countdown text deactivates after start
 
 ### Score System
-- **ScoreManager:** Singleton, synced via Photon Room Properties
+- **ScoreManager:** AddScore() and SubtractScore() methods
 - **Points per box:** 10 (configurable)
-- **ScoreDisplay:** 2D TextMeshPro showing "{TeamName}: {Score}"
+- **ScoreDisplay:** Shows "SKOR: {value}" format
+
+### Game Recording (CSV)
+- **Location:** `kayitlar/oyun_sonuclari.csv` (next to Assets folder)
+- **Format:** Tarih;Saat;Takim A;Takim A Puan;Takim B;Takim B Puan;Kazanan;Oyun Suresi
+- **Saved by:** Master Client only, on game end
+- **Used for:** Leaderboard top 10
+
+### Leaderboard
+- Shows after EndGame panel (5 second delay)
+- Top 10 teams by highest score ever
+- Same team = best score kept
+- Synced via RPC from Master Client to all players
+- Inspector: 10x TeamName texts + 10x TeamScore texts
+
+### Team Name Input
+- **Max characters:** 17 (configurable in GameReadyPanel)
+- One player ready = entire team ready
+- Stored in Room Properties
 
 ### Win Condition
 - FinishLine passes through all team tanks = Team Finished
@@ -177,7 +211,6 @@ Master Client presses F5 to reload (new game)
 
 - Teams cannot see each other (camera culling mask)
 - Teams cannot collide (Physics2D layer collision matrix)
-- Custom team names stored in Room Properties
 
 ## Networking Architecture
 
@@ -212,105 +245,71 @@ GAME_STARTED     // bool - Game has started
 GamePaused       // bool - Game paused state
 ```
 
-### Network Flow
-1. `NetworkManager` connects to Photon, joins/creates room
-2. `LobbyManager` handles team selection (4 buttons)
-3. Master Client loads GameScene when ready
-4. `TankGameManager` spawns tanks/spectators
-5. `GameReadyPanel` shows for team name input
-6. Master Client presses F1 → `GameController.StartGame()`
-7. Checks `AreBothTeamsReady()` then fires `RPC_StartGame`
-8. `BlockSpawner.StartSpawning()` begins
-9. `FinishLine` starts moving after `OnGameStarted` event
-10. `GameSessionManager` handles finish detection and winner
+### Key RPC Methods
+- `GameController.RPC_StartCountdown(int seconds)` - Start countdown on all clients
+- `GameController.RPC_StartGame()` - Start game on all clients
+- `TankController.RPC_DamageFlash()` - Flash tank red on all clients
+- `TankBullet.RPC_StickToBox(int boxViewID)` - Sync bullet stick effect
+- `FloatingTextManager.RPC_ShowFloatingText(int points, Vector3 pos)` - Show floating text
+- `GameEndUI.RPC_ReceiveLeaderboard(string[] names, int[] scores)` - Sync leaderboard
 
 ### Object Ownership
 - **Player tanks:** Owned by spawning player
 - **Bullets:** Owned by firing player
-- **Blocks:** Owned by Master Client (PhotonNetwork.Instantiate)
-- **Scene boxes (in blocks):** Use RPC for destruction (RpcTarget.All)
-- **Spectator cameras:** Local only (not networked)
-
-### InstantiationData Usage
-- **Bullet:** `[0] = tankColor (int)`
-- **Block:** `[0] = moveSpeed (float), [1] = destroyXPosition (float)`
-- **FinishLine:** `[0] = moveSpeed, [1] = destroyXPosition, [2] = requiredTankCount (int), [3] = teamId (int)`
+- **Blocks:** Owned by Master Client
+- **Scene boxes:** Use RPC for destruction
+- **Spectator cameras:** Local only
 
 ## Script Reference
 
-### GameController.cs (TankGame.Game) - NEW
-- Central game flow control
-- **F1:** Start game (requires both teams ready)
-- **F5:** Reload scene (RPC to all clients)
-- Events: `OnGameStarted`, `OnGamePaused`, `OnSceneReloading`
-- Methods: `StartGame()`, `ReloadScene()`, `IsGameStarted()`
-- Triggers `BlockSpawner.StartSpawning()` on game start
+### GameController.cs (TankGame.Game)
+- Central game flow control with countdown
+- **F1:** Start countdown (10s default), requires both teams ready
+- **F5:** Reload scene
+- `countdownText` - TMP_Text for countdown display
+- `countdownSeconds = 10` - Configurable countdown
+- `countdownStartMessage = "BAŞLA!"` - Message at 0
 
-### GameReadyPanel.cs (TankGame.Game) - NEW
-- Team name input UI at game start
-- One player ready = entire team ready
-- Shows readiness status for both teams
-- Auto-hides when game starts
-- Events: `OnAllPlayersReady`, `OnLocalPlayerReady(teamName)`
-
-### BlockSpawner.cs (TankGame.Block)
-- **Does NOT auto-start** - waits for `StartSpawning()` call
-- Spawns blocks at intervals for both teams
-- Spawns FinishLine after all blocks (with spawnInterval delay)
-- Master Client only
-- `StartSpawning()` resets index and starts spawning
-
-### FinishLine.cs (TankGame.Block)
-- **Does NOT move until game starts** - listens to `GameController.OnGameStarted`
-- Counts tanks passing through (OnTriggerEnter2D)
-- Fires `OnTeamFinished` event when requiredTankCount reached
-
-### GameSessionManager.cs (TankGame.Game)
-- Singleton managing game state
-- Listens to FinishLine.OnTeamFinished
-- Determines winner based on score (higher wins, tie = first finisher)
-- States: Playing → WaitingFinish → Ended
-- Events: `OnGameStateChanged(GameState)`, `OnGameEnded(winnerTeamId, teamAScore, teamBScore)`
-
-### GameEndUI.cs (TankGame.Game)
-- Shows end game panel with team names
-- Displays KAZANDINIZ/KAYBETTİNİZ based on local player's team
-- Shows winner team name and both scores
-- Hint text: "F5 ile yeni oyun" (Master Client) / "Oda sahibi yeni oyun başlatabilir"
-
-### ScoreDisplay.cs (TankGame.Score)
-- 2D World Space TextMeshPro display
-- Shows "{TeamName}: {Score}" format
-- Listens to Room Properties for team name updates
-- Inherits from MonoBehaviourPunCallbacks
+### Box.cs (TankGame)
+- OnTriggerEnter2D detects tank collision
+- Subtracts score, shows floating text, triggers damage flash
+- Only tank owner processes collision (prevents duplicates)
 
 ### TankController.cs (TankGame.Tank)
-- Movement with WASD/Arrows or Joystick
-- Shooting with Space or Fire Button
-- `SetJoystick(Joystick)` for mobile input
-- `OnFireButtonDown()` / `OnFireButtonUp()` for mobile fire
+- `TriggerDamageFlash()` - RPC to all clients for red flash
+- `SyncRemotePlayer()` - Smooth network interpolation with SmoothDamp
 
 ### TankBullet.cs (TankGame.Tank)
-- **Namespace changed:** TankGame.Tank (was TankGame.Player)
-- Color from InstantiationData
-- Adds score via ScoreManager.Instance.AddScore()
-- `isDestroyed` flag prevents double-destroy
+- `StickToBox(Box box)` - Bullet becomes child of box
+- `stickDestroyDelay = 1f` - Wait before destroying both
+- `rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous`
 
-### MobileInputManager.cs (TankGame.MobileInput) - NEW
-- Manages mobile joystick and fire button
-- Only active for players (not spectators)
-- Activates when game starts, disables when game ends
-- Integrates with TankController
+### GameSessionManager.cs (TankGame.Game)
+- `SaveGameResult()` - Saves to CSV on game end
+- Records: date, time, team names, scores, winner, duration
 
-### PlayerInfo.cs (Root) - ENHANCED
-New methods for team names:
-- `GetCustomTeamName(int teamId)` - Get team name from Room Properties
-- `SetCustomTeamName(int teamId, string name)` - Set team name
-- `IsTeamReady(int teamId)` - Check team ready status
-- `SetTeamReady(int teamId, bool ready)` - Set team ready
-- `AreBothTeamsReady()` - Check if both teams ready
-- `ResetTeamReadyStates()` - Reset for new game
-- `IsGameStarted()` / `SetGameStarted(bool)` - Game state
+### GameEndUI.cs (TankGame.Game)
+- Requires PhotonView component
+- `leaderboardDelay = 5f` - Seconds before showing leaderboard
+- `leaderboardTeamNames` - List of 10 TMP texts
+- `leaderboardTeamScores` - List of 10 TMP texts
+- `SendLeaderboardToAll()` - Master reads CSV, sends via RPC
+
+### FloatingTextManager.cs (TankGame.UI)
+- Singleton with PhotonView
+- `ShowFloatingText(int points, Vector3 position)` - RPC to all
+
+### FloatingText.cs (TankGame.UI)
+- Object pooled (INITIAL_POOL_SIZE = 20)
+- Green +points float up, Red -points float down
+
+### ScoreManager.cs (TankGame.Score)
+- `AddScore(int teamId, int points)` - Add points
+- `SubtractScore(int teamId, int points)` - Subtract points
+
+### GameReadyPanel.cs (TankGame.Game)
+- `maxTeamNameLength = 17` - Character limit for team names
+- `nameInput.characterLimit` set in Start()
 
 ## Events System
 
@@ -337,47 +336,26 @@ static event Action<int, int> OnScoreChanged; // (teamAScore, teamBScore)
 
 ## Unity Configuration
 
-### Required Layers (must exist in TagManager)
+### Required Layers
 - Layer 8: `TeamA`
 - Layer 9: `TeamB`
 - Layer 10: `Spectator`
 
-### Physics2D Collision Matrix
-- TeamA ↔ TeamB: **Disabled**
-- Spectator ↔ TeamA/TeamB: **Disabled**
-- All other collisions: **Enabled**
-
-### Required Prefabs in Resources/
-- Tank_Green, Tank_Grey, Tank_Orange, Tank_Purple, Tank_Yellow
-- Bullet
-- SpectatorCamera
-- FinishLine (with PhotonView, FinishLine script, BoxCollider2D trigger)
-- Block prefabs (with PhotonView, BlockMover script)
-
-## Development
-
-### Testing Multiplayer Locally
-Use **ParrelSync** (included in project):
-1. Window → ParrelSync → Clones Manager
-2. Create a clone
-3. Open clone in separate Unity Editor
-4. Run both editors simultaneously
-
-### Test Mode
-Enable `testMode` in TankController Inspector to allow bullets to destroy ALL color boxes.
+### Required Components
+- **GameEndUI:** Needs PhotonView component
+- **FloatingTextManager:** Needs PhotonView component
+- **GameController:** Has PhotonView (RequireComponent)
 
 ### GameScene Setup Checklist
-- [ ] GameController GameObject with script
-- [ ] BlockSpawner GameObject with script
-- [ ] SpawnPointTeamA and SpawnPointTeamB transforms assigned
-- [ ] Block prefab names added to BlockSpawner list
-- [ ] FinishLine prefab in Resources/ folder
-- [ ] ScoreManager GameObject with script
-- [ ] ScoreDisplay for Team A (teamId=0) with TextMeshPro
-- [ ] ScoreDisplay for Team B (teamId=1) with TextMeshPro
-- [ ] GameSessionManager GameObject with script
-- [ ] Canvas with GameReadyPanel script and UI elements
-- [ ] Canvas with GameEndUI script and EndGamePanel
+- [ ] GameController with countdownText reference
+- [ ] BlockSpawner with spawn settings
+- [ ] ScoreManager singleton
+- [ ] ScoreDisplay for each team
+- [ ] GameSessionManager singleton
+- [ ] GameReadyPanel with UI elements
+- [ ] GameEndUI with PhotonView and leaderboard texts (10 each)
+- [ ] FloatingTextManager with PhotonView
+- [ ] FloatingText prefab in Resources
 
 ## Current Development Status
 
@@ -386,19 +364,23 @@ Enable `testMode` in TankController Inspector to allow bullets to destroy ALL co
 - ✅ Team selection (4 buttons in lobby)
 - ✅ Tank spawning and movement
 - ✅ Shooting system with network sync
-- ✅ Color-based box destruction
+- ✅ Color-based box destruction with stick mechanic
 - ✅ Block spawner and movement
 - ✅ Finish line detection
-- ✅ Score system (per team, Photon synced)
-- ✅ Score display (2D World Space with team names)
+- ✅ Score system (AddScore, SubtractScore)
+- ✅ Score display with team names
+- ✅ Tank collision penalty (-points, red flash)
+- ✅ Floating text feedback (+/- points)
 - ✅ Game session management (win/lose logic)
-- ✅ End game UI (KAZANDINIZ/KAYBETTİNİZ with team names)
-- ✅ Custom team names (GameReadyPanel)
-- ✅ Game control (F1 start, F5 reload)
-- ✅ Mobile input support (joystick, fire button)
+- ✅ Game result CSV recording
+- ✅ End game UI with team names
+- ✅ Leaderboard (top 10, RPC synced)
+- ✅ Custom team names (max 17 chars)
+- ✅ 10-second countdown before game start
+- ✅ Smooth network interpolation (SmoothDamp)
+- ✅ Mobile input support
 
 ### TODO / Next Steps
-- [ ] Top 10 leaderboard after game end
 - [ ] Tank death/respawn system
 - [ ] Health system
 - [ ] Sound effects
