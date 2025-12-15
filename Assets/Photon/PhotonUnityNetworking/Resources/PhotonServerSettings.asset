@@ -35,15 +35,15 @@ MonoBehaviour:
   StartInOfflineMode: 0
   RpcList:
   - ClickRpc
+  - DestroyBox
   - DestroyRpc
   - DestroySpaceship
   - Fire
   - RespawnSpaceship
-  - DestroyBox
-  - RPC_SetColor
   - RPC_ReloadScene
-  - RPC_StartGame
   - RPC_ShowFloatingText
+  - RPC_StartGame
+  - RPC_StickToBox
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

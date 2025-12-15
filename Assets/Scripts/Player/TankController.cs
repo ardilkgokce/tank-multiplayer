@@ -3,6 +3,7 @@ using Photon.Pun;
 using TankGame;
 using TankGame.Game;
 using TankGame.MobileInput;
+using System.Collections;
 
 namespace TankGame.Tank
 {
@@ -59,6 +60,13 @@ namespace TankGame.Tank
         // Joystick reference (runtime'da atanır)
         private Joystick movementJoystick;
 
+        // Damage flash effect
+        private bool isFlashing = false;
+        private float flashDuration = 1f;
+        private float flashSpeed = 10f;
+        private Color originalColor;
+        private Coroutine flashCoroutine;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -82,6 +90,12 @@ namespace TankGame.Tank
             if (pv.IsMine)
             {
                 TankBullet.TestMode = testMode;
+            }
+
+            // Original rengi kaydet (flash efekti için)
+            if (spriteRenderer != null)
+            {
+                originalColor = spriteRenderer.color;
             }
 
             // Sprite rengi zaten prefab'da tanımlı (Tank_Green, Tank_Purple vb.)
@@ -280,6 +294,55 @@ namespace TankGame.Tank
                 float lag = Mathf.Abs((float)(PhotonNetwork.Time - info.SentServerTime));
                 networkPosition += (Vector3)(networkVelocity * lag);
             }
+        }
+
+        #endregion
+
+        #region Damage Flash Effect
+
+        /// <summary>
+        /// Puan kaybedildiğinde çağrılır - tüm clientlarda kırmızı yanıp sönme
+        /// </summary>
+        public void TriggerDamageFlash()
+        {
+            // RPC ile tüm clientlara gönder
+            pv.RPC(nameof(RPC_DamageFlash), RpcTarget.All);
+        }
+
+        [PunRPC]
+        private void RPC_DamageFlash()
+        {
+            // Önceki flash devam ediyorsa durdur
+            if (flashCoroutine != null)
+            {
+                StopCoroutine(flashCoroutine);
+            }
+
+            // Yeni flash başlat
+            flashCoroutine = StartCoroutine(DamageFlashCoroutine());
+        }
+
+        private IEnumerator DamageFlashCoroutine()
+        {
+            if (spriteRenderer == null) yield break;
+
+            isFlashing = true;
+            float elapsed = 0f;
+
+            while (elapsed < flashDuration)
+            {
+                // Kırmızı ve beyaz arasında ping-pong
+                float t = Mathf.PingPong(elapsed * flashSpeed, 1f);
+                spriteRenderer.color = Color.Lerp(Color.white, Color.red, t);
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Original renge dön
+            spriteRenderer.color = originalColor;
+            isFlashing = false;
+            flashCoroutine = null;
         }
 
         #endregion

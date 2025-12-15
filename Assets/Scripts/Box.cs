@@ -71,6 +71,9 @@ namespace TankGame
                 FloatingTextManager.Instance.ShowFloatingText(-points, transform.position);
             }
 
+            // Tank'ı kırmızı yanıp söndür - tüm clientlarda
+            tank.TriggerDamageFlash();
+
             // Box'ı yok et
             RequestDestroy();
         }

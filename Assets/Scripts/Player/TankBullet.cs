@@ -23,14 +23,22 @@ namespace TankGame.Tank
         [SerializeField] private float speed = 15f;
         [SerializeField] private float lifetime = 3f;
 
+        [Header("Stick Settings")]
+        [Tooltip("Box'a yapıştıktan sonra yok olma gecikmesi")]
+        [SerializeField] private float stickDestroyDelay = 1f;
+
         private Rigidbody2D rb;
         private TankColor bulletColor;
         private bool isDestroyed = false;
+        private bool isStuck = false;
+        private Box stuckBox = null;
 
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
+            // Hızlı hareket eden objeler için continuous collision detection
+            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         }
 
         private void Start()
@@ -53,10 +61,92 @@ namespace TankGame.Tank
 
         private void DestroyBullet()
         {
-            if (photonView.IsMine)
+            if (photonView.IsMine && !isStuck)
             {
                 PhotonNetwork.Destroy(gameObject);
             }
+        }
+
+        /// <summary>
+        /// Bullet'ı box'a yapıştırır
+        /// </summary>
+        private void StickToBox(Box box)
+        {
+            isStuck = true;
+            stuckBox = box;
+
+            // Hareketi durdur
+            rb.velocity = Vector2.zero;
+            rb.isKinematic = true;
+
+            // Box'ın child'ı yap (box ile birlikte hareket etsin)
+            transform.SetParent(box.transform);
+
+            // Lifetime invoke'u iptal et
+            CancelInvoke(nameof(DestroyBullet));
+
+            // Tüm clientlarda yapışma efektini göster
+            photonView.RPC(nameof(RPC_StickToBox), RpcTarget.Others, box.photonView.ViewID);
+
+            // Gecikme sonrası yok et
+            Invoke(nameof(DestroyStuckBox), stickDestroyDelay);
+        }
+
+        [PunRPC]
+        private void RPC_StickToBox(int boxViewID)
+        {
+            // Diğer clientlarda da yapışma efektini uygula
+            PhotonView boxPV = PhotonView.Find(boxViewID);
+            if (boxPV != null)
+            {
+                Box box = boxPV.GetComponent<Box>();
+                if (box != null)
+                {
+                    isStuck = true;
+                    stuckBox = box;
+
+                    // Hareketi durdur
+                    rb.velocity = Vector2.zero;
+                    rb.isKinematic = true;
+
+                    // Box'ın child'ı yap
+                    transform.SetParent(box.transform);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Yapışık box ve bullet'ı yok eder
+        /// </summary>
+        private void DestroyStuckBox()
+        {
+            if (!photonView.IsMine) return;
+            if (stuckBox == null) return;
+
+            // Box pozisyonunu kaydet
+            Vector3 boxPosition = stuckBox.transform.position;
+
+            // Skor ekle
+            int teamId = PlayerInfo.GetTeamID(photonView.Owner);
+            int points = 0;
+            if (ScoreManager.Instance != null)
+            {
+                points = ScoreManager.Instance.GetPointsPerBox();
+                ScoreManager.Instance.AddScore(teamId);
+            }
+
+            // Floating text göster - tüm clientlarda
+            if (FloatingTextManager.Instance != null)
+            {
+                FloatingTextManager.Instance.ShowFloatingText(points, boxPosition);
+            }
+
+            // Box'ı yok et
+            stuckBox.RequestDestroy();
+
+            // Bullet'ı yok et
+            isDestroyed = true;
+            PhotonNetwork.Destroy(gameObject);
         }
 
         /// <summary>
@@ -81,32 +171,14 @@ namespace TankGame.Tank
             Box box = other.GetComponent<Box>();
             if (box != null)
             {
-                // Test modunda veya renk eşleşiyorsa box'ı yok et
+                // Test modunda veya renk eşleşiyorsa box'a yapış
                 if (TestMode || box.GetColor() == bulletColor)
                 {
-                    // Box pozisyonunu kaydet (destroy'dan önce)
-                    Vector3 boxPosition = box.transform.position;
+                    // Zaten yapışmışsa işlem yapma
+                    if (isStuck) return;
 
-                    // Box ve bullet yok olsun
-                    box.RequestDestroy();
-
-                    // Skor ekle (bullet sahibinin takımına)
-                    int teamId = PlayerInfo.GetTeamID(photonView.Owner);
-                    int points = 0;
-                    if (ScoreManager.Instance != null)
-                    {
-                        points = ScoreManager.Instance.GetPointsPerBox();
-                        ScoreManager.Instance.AddScore(teamId);
-                    }
-
-                    // Floating text göster (pozitif puan) - tüm clientlarda
-                    if (FloatingTextManager.Instance != null)
-                    {
-                        FloatingTextManager.Instance.ShowFloatingText(points, boxPosition);
-                    }
-
-                    isDestroyed = true;
-                    PhotonNetwork.Destroy(gameObject);
+                    // Box'a yapış
+                    StickToBox(box);
                 }
                 else
                 {
