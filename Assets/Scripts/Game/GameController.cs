@@ -99,13 +99,13 @@ namespace TankGame.Game
             if (!PhotonNetwork.IsMasterClient) return;
             if (isGameStarted) return;
 
-            // Tüm oyuncular hazır mı kontrol et
-            if (!PlayerInfo.AreAllPlayersReadyExcludingSpectators())
+            // Her iki takım da hazır mı kontrol et
+            if (!PlayerInfo.AreBothTeamsReady())
             {
-                Debug.Log("Tüm oyuncular hazır değil!");
+                Debug.Log("Tüm takımlar hazır değil!");
                 if (masterClientHintText != null)
                 {
-                    masterClientHintText.text = "Tüm oyuncular hazır değil!";
+                    masterClientHintText.text = "Tüm takımlar hazır değil!";
                 }
                 return;
             }
@@ -179,6 +179,10 @@ namespace TankGame.Game
             if (!PhotonNetwork.IsMasterClient) return;
 
             Debug.Log("Sahne yenileniyor...");
+
+            // Takım hazırlık durumlarını sıfırla
+            PlayerInfo.ResetTeamReadyStates();
+            PlayerInfo.SetGameStarted(false);
 
             // RPC ile tüm client'lara bildir
             photonView.RPC("RPC_ReloadScene", RpcTarget.All);

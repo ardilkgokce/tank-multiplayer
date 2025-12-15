@@ -27,9 +27,11 @@ public class PlayerInfo
     public const int TEAM_A = 0;
     public const int TEAM_B = 1;
 
-    // Room Property Key'leri (Takım isimleri)
+    // Room Property Key'leri (Takım isimleri ve hazırlık durumu)
     public const string TEAM_A_NAME = "TeamAName";
     public const string TEAM_B_NAME = "TeamBName";
+    public const string TEAM_A_READY = "TeamAReady";
+    public const string TEAM_B_READY = "TeamBReady";
     public const string GAME_STARTED = "GameStarted";
 
     // Tank renk isimleri (sırayla)
@@ -308,5 +310,58 @@ public class PlayerInfo
             case TEAM_B: return "Takım B";
             default: return "Yok";
         }
+    }
+
+    /// <summary>
+    /// Takımın hazır olup olmadığını kontrol eder.
+    /// </summary>
+    public static bool IsTeamReady(int teamID)
+    {
+        if (PhotonNetwork.CurrentRoom == null) return false;
+
+        string key = teamID == TEAM_A ? TEAM_A_READY : TEAM_B_READY;
+        object ready;
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(key, out ready))
+        {
+            return (bool)ready;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Takımın hazır durumunu ayarlar.
+    /// </summary>
+    public static void SetTeamReady(int teamID, bool ready)
+    {
+        if (PhotonNetwork.CurrentRoom == null) return;
+
+        string key = teamID == TEAM_A ? TEAM_A_READY : TEAM_B_READY;
+        Hashtable props = new Hashtable { { key, ready } };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// Her iki takım da hazır mı kontrol eder.
+    /// </summary>
+    public static bool AreBothTeamsReady()
+    {
+        return IsTeamReady(TEAM_A) && IsTeamReady(TEAM_B);
+    }
+
+    /// <summary>
+    /// Tüm takım hazırlık durumlarını sıfırlar (sahne yenilendiğinde çağrılır).
+    /// </summary>
+    public static void ResetTeamReadyStates()
+    {
+        if (PhotonNetwork.CurrentRoom == null) return;
+
+        Hashtable props = new Hashtable
+        {
+            { TEAM_A_READY, false },
+            { TEAM_B_READY, false },
+            { TEAM_A_NAME, "" },
+            { TEAM_B_NAME, "" }
+        };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(props);
     }
 }
