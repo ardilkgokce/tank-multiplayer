@@ -3,6 +3,7 @@ using Photon.Pun;
 using TankGame;
 using TankGame.Game;
 using TankGame.MobileInput;
+using TankGame.Audio;
 using System.Collections;
 
 namespace TankGame.Tank
@@ -288,10 +289,27 @@ namespace TankGame.Tank
                 return;
             }
 
+            // Ateş sesini takım arkadaşlarına gönder (RPC)
+            pv.RPC(nameof(RPC_PlayFireSound), RpcTarget.All, teamID);
+
             // Bullet'ı network üzerinden oluştur
             // Renk bilgisini instantiation data olarak gönder (RPC race condition önlenir)
             object[] instantiationData = new object[] { (int)tankColor };
             PhotonNetwork.Instantiate(bulletPrefabName, firePoint.position, Quaternion.identity, 0, instantiationData);
+        }
+
+        [PunRPC]
+        private void RPC_PlayFireSound(int senderTeamID)
+        {
+            // Sadece aynı takımdakiler ve o takımın izleyicileri duyar
+            int myTeamID = PlayerInfo.GetTeamID(PhotonNetwork.LocalPlayer);
+            if (myTeamID == senderTeamID)
+            {
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlayFireSound();
+                }
+            }
         }
 
         /// <summary>

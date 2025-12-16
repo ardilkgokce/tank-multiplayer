@@ -47,6 +47,9 @@ MonoBehaviour:
   - RPC_StartGame
   - RPC_StickToBox
   - RPC_StartCountdown
+  - RPC_PlayExplosionSound
+  - RPC_PlayFireSound
+  - RPC_PlayStickSound
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

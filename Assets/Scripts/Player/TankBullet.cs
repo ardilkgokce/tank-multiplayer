@@ -3,6 +3,7 @@ using Photon.Pun;
 using TankGame;
 using TankGame.Score;
 using TankGame.UI;
+using TankGame.Audio;
 
 namespace TankGame.Tank
 {
@@ -75,6 +76,10 @@ namespace TankGame.Tank
             isStuck = true;
             stuckBox = box;
 
+            // Yapışma sesini takıma gönder (RPC)
+            int teamId = PlayerInfo.GetTeamID(photonView.Owner);
+            photonView.RPC(nameof(RPC_PlayStickSound), RpcTarget.All, teamId);
+
             // Hareketi durdur
             rb.velocity = Vector2.zero;
             rb.isKinematic = true;
@@ -90,6 +95,20 @@ namespace TankGame.Tank
 
             // Gecikme sonrası yok et
             Invoke(nameof(DestroyStuckBox), stickDestroyDelay);
+        }
+
+        [PunRPC]
+        private void RPC_PlayStickSound(int senderTeamID)
+        {
+            // Sadece aynı takımdakiler ve o takımın izleyicileri duyar
+            int myTeamID = PlayerInfo.GetTeamID(PhotonNetwork.LocalPlayer);
+            if (myTeamID == senderTeamID)
+            {
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlayBulletStickSound();
+                }
+            }
         }
 
         [PunRPC]
@@ -126,8 +145,11 @@ namespace TankGame.Tank
             // Box pozisyonunu kaydet
             Vector3 boxPosition = stuckBox.transform.position;
 
-            // Skor ekle
+            // Patlama sesini takıma gönder (RPC)
             int teamId = PlayerInfo.GetTeamID(photonView.Owner);
+            photonView.RPC(nameof(RPC_PlayExplosionSound), RpcTarget.All, teamId);
+
+            // Skor ekle
             int points = 0;
             if (ScoreManager.Instance != null)
             {
@@ -147,6 +169,20 @@ namespace TankGame.Tank
             // Bullet'ı yok et
             isDestroyed = true;
             PhotonNetwork.Destroy(gameObject);
+        }
+
+        [PunRPC]
+        private void RPC_PlayExplosionSound(int senderTeamID)
+        {
+            // Sadece aynı takımdakiler ve o takımın izleyicileri duyar
+            int myTeamID = PlayerInfo.GetTeamID(PhotonNetwork.LocalPlayer);
+            if (myTeamID == senderTeamID)
+            {
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlayExplosionSound();
+                }
+            }
         }
 
         /// <summary>

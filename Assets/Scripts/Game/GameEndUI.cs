@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System;
+using TankGame.Audio;
 
 namespace TankGame.Game
 {
@@ -79,6 +80,12 @@ namespace TankGame.Game
         private void OnGameEnded(int winnerTeamId, int teamAScore, int teamBScore)
         {
             Debug.Log($"GameEndUI: Oyun bitti! Kazanan: {winnerTeamId}, A: {teamAScore}, B: {teamBScore}");
+
+            // Oyun bitiş sesini çal
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayGameEndSound();
+            }
 
             // Paneli göster
             if (endGamePanel != null)
