@@ -171,8 +171,9 @@ namespace TankGame.Block
                 finishLineSpawned = false;
 
                 isSpawning = true;
-                nextSpawnTime = Time.time + initialDelay;
-                Debug.Log($"BlockSpawner spawn başlatıldı. İlk spawn: {initialDelay} saniye sonra");
+                // İlk blok hemen spawn olsun, sonrakiler spawnInterval ile
+                nextSpawnTime = Time.time;
+                Debug.Log("BlockSpawner spawn başlatıldı. İlk blok hemen spawn oluyor.");
             }
         }
 

@@ -45,6 +45,7 @@ namespace TankGame.Game
         private float waitTimer = 0f;
         private bool isWaiting = false;
         private HashSet<int> finishedTeams = new HashSet<int>();
+        private int firstFinishedTeam = -1; // Beraberlik için ilk finish olan takım
 
         // Oyun başlangıç zamanı (kayıt için)
         private DateTime gameStartTime;
@@ -112,6 +113,13 @@ namespace TankGame.Game
         {
             Debug.Log($"GameSessionManager: Takım {teamId} finish oldu!");
 
+            // İlk finish olan takımı kaydet (beraberlik durumu için)
+            if (firstFinishedTeam == -1)
+            {
+                firstFinishedTeam = teamId;
+                Debug.Log($"İlk finish olan takım: {teamId}");
+            }
+
             // Bu takımı finish olarak işaretle
             finishedTeams.Add(teamId);
 
@@ -178,8 +186,8 @@ namespace TankGame.Game
             else
             {
                 // Beraberlik - ilk finish olan kazanır
-                // finishedTeams HashSet'inin ilk elemanı ilk finish olan
-                winnerTeam = finishedTeams.Count > 0 ? GetFirstFinishedTeam() : -1;
+                winnerTeam = firstFinishedTeam;
+                Debug.Log($"Beraberlik! İlk finish olan takım kazandı: {winnerTeam}");
             }
 
             // Room property'ye kaydet
@@ -190,23 +198,6 @@ namespace TankGame.Game
 
             // Oyun sonucunu dosyaya kaydet (sadece Master Client)
             SaveGameResult(winnerTeam, teamAScore, teamBScore);
-        }
-
-        /// <summary>
-        /// İlk finish olan takımı döndürür (beraberlik durumu için)
-        /// </summary>
-        private int GetFirstFinishedTeam()
-        {
-            // Room property'lerden kontrol et
-            if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(TEAM_A_FINISHED, out object teamAFinished))
-            {
-                if ((bool)teamAFinished) return 0;
-            }
-            if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(TEAM_B_FINISHED, out object teamBFinished))
-            {
-                if ((bool)teamBFinished) return 1;
-            }
-            return -1;
         }
 
         /// <summary>
