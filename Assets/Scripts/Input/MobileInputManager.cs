@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using Photon.Pun;
 using TankGame.Game;
 using TankGame.Tank;
+using System.Collections;
 
 namespace TankGame.MobileInput
 {
@@ -20,10 +21,16 @@ namespace TankGame.MobileInput
         [SerializeField] private Joystick movementJoystick;
         [SerializeField] private Button fireButton;
 
+        [Header("Blink Settings")]
+        [SerializeField] private int blinkCount = 3;
+        [SerializeField] private float blinkDuration = 0.3f;
+        [SerializeField] private float blinkAlpha = 0.3f;
+
         // Local player'ın tank controller'ı
         private TankController localTankController;
         private bool isSpectator = false;
         private bool isInitialized = false;
+        private Image fireButtonImage;
 
         private void Awake()
         {
@@ -64,6 +71,12 @@ namespace TankGame.MobileInput
 
             // Fire button event'lerini ayarla
             SetupFireButton();
+
+            // Fire button'un Image component'ini al
+            if (fireButton != null)
+            {
+                fireButtonImage = fireButton.GetComponent<Image>();
+            }
 
             isInitialized = true;
             Debug.Log("MobileInputManager: Oyuncu - joystick hazır, oyun başlamasını bekliyor");
@@ -121,8 +134,55 @@ namespace TankGame.MobileInput
                 Debug.Log("MobileInputManager: Joystick ve Fire butonu aktif edildi");
             }
 
+            // Fire button'u blink yap (yerini göster)
+            if (fireButtonImage != null)
+            {
+                StartCoroutine(BlinkFireButton());
+            }
+
             // Local tank'ı bul ve joystick'i bağla
             FindAndConnectLocalTank();
+        }
+
+        /// <summary>
+        /// Fire button'u smooth fade ile gösterir (0 -> 0.3 -> 0 şeklinde)
+        /// </summary>
+        private IEnumerator BlinkFireButton()
+        {
+            Color color = fireButtonImage.color;
+
+            for (int i = 0; i < blinkCount; i++)
+            {
+                // Fade in: 0 -> blinkAlpha
+                float elapsed = 0f;
+                while (elapsed < blinkDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / blinkDuration;
+                    color.a = Mathf.Lerp(0f, blinkAlpha, t);
+                    fireButtonImage.color = color;
+                    yield return null;
+                }
+                color.a = blinkAlpha;
+                fireButtonImage.color = color;
+
+                // Fade out: blinkAlpha -> 0
+                elapsed = 0f;
+                while (elapsed < blinkDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / blinkDuration;
+                    color.a = Mathf.Lerp(blinkAlpha, 0f, t);
+                    fireButtonImage.color = color;
+                    yield return null;
+                }
+                color.a = 0f;
+                fireButtonImage.color = color;
+            }
+
+            // Son olarak alpha = 0
+            color.a = 0f;
+            fireButtonImage.color = color;
         }
 
         /// <summary>
