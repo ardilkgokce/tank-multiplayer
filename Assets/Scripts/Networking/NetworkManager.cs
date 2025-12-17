@@ -19,6 +19,7 @@ namespace TankGame.Networking
 
         [Header("Room Settings")]
         [SerializeField] private byte maxPlayersPerRoom = 12; // 10 oyuncu + 2 izleyici
+        [SerializeField] private string roomName = "TankGameRoom"; // Sabit oda adı
 
         private void Awake()
         {
@@ -83,21 +84,21 @@ namespace TankGame.Networking
         public override void OnConnectedToMaster()
         {
             Debug.Log("OnConnectedToMaster: Photon Master sunucusuna bağlandı");
-            UpdateStatus("Sunucuya bağlandı. Oda aranıyor...");
+            UpdateStatus("Sunucuya bağlandı. Lobby'ye katılınıyor...");
 
-            // Random odaya katıl, yoksa oluştur
-            PhotonNetwork.JoinRandomRoom();
+            // Önce lobby'ye katıl, sonra oda ara
+            PhotonNetwork.JoinLobby();
         }
 
         /// <summary>
-        /// Random oda bulunamadı
+        /// Lobby'ye başarıyla katıldı
         /// </summary>
-        public override void OnJoinRandomFailed(short returnCode, string message)
+        public override void OnJoinedLobby()
         {
-            Debug.Log($"OnJoinRandomFailed: Oda bulunamadı. Yeni oda oluşturuluyor... ({message})");
-            UpdateStatus("Oda bulunamadı. Yeni oda oluşturuluyor...");
+            Debug.Log("OnJoinedLobby: Lobby'ye katıldı");
+            UpdateStatus("Lobby'ye katıldı. Odaya katılınıyor...");
 
-            // Yeni oda oluştur
+            // JoinOrCreateRoom: Oda varsa katıl, yoksa oluştur (atomic işlem)
             RoomOptions roomOptions = new RoomOptions
             {
                 MaxPlayers = maxPlayersPerRoom,
@@ -105,7 +106,35 @@ namespace TankGame.Networking
                 IsOpen = true
             };
 
-            PhotonNetwork.CreateRoom(null, roomOptions);
+            PhotonNetwork.JoinOrCreateRoom(roomName, roomOptions, TypedLobby.Default);
+        }
+
+        /// <summary>
+        /// Oda oluşturma başarısız oldu
+        /// </summary>
+        public override void OnCreateRoomFailed(short returnCode, string message)
+        {
+            Debug.LogError($"OnCreateRoomFailed: Oda oluşturulamadı. Kod: {returnCode}, Mesaj: {message}");
+            UpdateStatus($"Oda oluşturulamadı: {message}");
+
+            if (connectButton != null)
+            {
+                connectButton.interactable = true;
+            }
+        }
+
+        /// <summary>
+        /// JoinOrCreateRoom başarısız oldu (oda dolu veya kapalı)
+        /// </summary>
+        public override void OnJoinRoomFailed(short returnCode, string message)
+        {
+            Debug.LogError($"OnJoinRoomFailed: Odaya katılınamadı. Kod: {returnCode}, Mesaj: {message}");
+            UpdateStatus($"Odaya katılınamadı: {message}");
+
+            if (connectButton != null)
+            {
+                connectButton.interactable = true;
+            }
         }
 
         /// <summary>

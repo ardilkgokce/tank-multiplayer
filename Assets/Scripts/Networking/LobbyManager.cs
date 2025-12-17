@@ -214,6 +214,10 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         if (!AreAllPlayersSelectedTeam()) return;
 
         statusText.text = "Oyun başlatılıyor...";
+
+        // Odayı kapat - yeni oyuncular katılamasın
+        PhotonNetwork.CurrentRoom.IsOpen = false;
+
         PhotonNetwork.LoadLevel("GameScene");
     }
 

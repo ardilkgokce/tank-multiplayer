@@ -41,15 +41,16 @@ MonoBehaviour:
   - Fire
   - RespawnSpaceship
   - RPC_DamageFlash
-  - RPC_ReceiveLeaderboard
-  - RPC_ReloadScene
-  - RPC_ShowFloatingText
-  - RPC_StartGame
-  - RPC_StickToBox
-  - RPC_StartCountdown
   - RPC_PlayExplosionSound
   - RPC_PlayFireSound
   - RPC_PlayStickSound
+  - RPC_ReceiveLeaderboard
+  - RPC_ReloadScene
+  - RPC_SetTestMode
+  - RPC_ShowFloatingText
+  - RPC_StartCountdown
+  - RPC_StartGame
+  - RPC_StickToBox
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

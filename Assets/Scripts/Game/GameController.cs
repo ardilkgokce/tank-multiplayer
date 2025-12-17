@@ -6,6 +6,7 @@ using System;
 using System.Collections;
 using TankGame.Block;
 using TankGame.Score;
+using TankGame.Tank;
 using TMPro;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
@@ -15,6 +16,7 @@ namespace TankGame.Game
     /// Oyun akışını kontrol eder.
     /// F1: Oyunu başlat (Master Client)
     /// F5: Sahneyi yenile (Master Client)
+    /// F8: Test Mode aç/kapa (Master Client)
     /// </summary>
     [RequireComponent(typeof(PhotonView))]
     public class GameController : MonoBehaviourPunCallbacks
@@ -103,6 +105,12 @@ namespace TankGame.Game
             if (Input.GetKeyDown(KeyCode.F5))
             {
                 ReloadScene();
+            }
+
+            // F8: Test Mode aç/kapa
+            if (Input.GetKeyDown(KeyCode.F8))
+            {
+                ToggleTestMode();
             }
         }
 
@@ -255,6 +263,24 @@ namespace TankGame.Game
         }
 
         /// <summary>
+        /// Test Mode'u açar/kapar (Master Client)
+        /// </summary>
+        private void ToggleTestMode()
+        {
+            if (!PhotonNetwork.IsMasterClient) return;
+
+            bool newTestMode = !TankBullet.TestMode;
+            photonView.RPC(nameof(RPC_SetTestMode), RpcTarget.All, newTestMode);
+        }
+
+        [PunRPC]
+        private void RPC_SetTestMode(bool enabled)
+        {
+            TankBullet.TestMode = enabled;
+            Debug.Log($"Test Mode: {(enabled ? "AÇIK" : "KAPALI")}");
+        }
+
+        /// <summary>
         /// Sahneyi yeniler (Master Client)
         /// </summary>
         private void ReloadScene()
@@ -266,6 +292,12 @@ namespace TankGame.Game
             // Takım hazırlık durumlarını sıfırla
             PlayerInfo.ResetTeamReadyStates();
             PlayerInfo.SetGameStarted(false);
+
+            // Odayı tekrar aç - yeni oyuncular katılabilsin
+            if (PhotonNetwork.CurrentRoom != null)
+            {
+                PhotonNetwork.CurrentRoom.IsOpen = true;
+            }
 
             // RPC ile tüm client'lara bildir
             photonView.RPC("RPC_ReloadScene", RpcTarget.All);
